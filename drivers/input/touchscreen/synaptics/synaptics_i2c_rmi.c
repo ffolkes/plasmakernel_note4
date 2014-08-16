@@ -5303,7 +5303,16 @@ static int synaptics_rmi4_input_open(struct input_dev *dev)
 	struct synaptics_rmi4_data *rmi4_data = input_get_drvdata(dev);
 	int retval;
 
-	dev_info(&rmi4_data->i2c_client->dev, "%s %s\n", __func__, rmi4_data->use_deepsleep ? "wakeup" : "");
+    dev_info(&rmi4_data->i2c_client->dev, "%s %s\n", __func__, rmi4_data->use_deepsleep ? "wakeup" : "");
+#ifdef CONFIG_TOUCH_WAKE
+	#ifdef TOUCHWAKE_DEBUG_PRINT
+	pr_info("[TOUCHWAKE] Synaptics input open\n");
+	#endif
+#endif
+
+#ifdef TSP_INIT_COMPLETE
+	retval = wait_for_completion_interruptible_timeout(&rmi4_data->init_done,
+			msecs_to_jiffies(90 * MSEC_PER_SEC));
 
 	if (rmi4_data->use_deepsleep) {
 
@@ -5322,8 +5331,23 @@ static void synaptics_rmi4_input_close(struct input_dev *dev)
 {
 	struct synaptics_rmi4_data *rmi4_data = input_get_drvdata(dev);
 
+#ifdef CONFIG_TOUCH_WAKE
+	// Don't change state if touchwake handles this
+	if (!touchwake_is_active()) {
+		#ifdef TOUCHWAKE_DEBUG_PRINT
+		pr_info("[TOUCHWAKE] Synaptics input close\n");
+		#endif
+#endif
 	dev_info(&rmi4_data->i2c_client->dev, "%s %s\n", __func__, rmi4_data->use_deepsleep ? "deepsleep" : "");
+    synaptics_rmi4_stop_device(rmi4_data);
 
+#ifdef CONFIG_TOUCH_WAKE
+	} else {
+		#ifdef TOUCHWAKE_DEBUG_PRINT
+		pr_info("[TOUCHWAKE] Synaptics suspend not allowed at the moment\n");
+		#endif
+	}
+#endif
 	if (rmi4_data->use_deepsleep)
 		synaptics_rmi4_sensor_sleep(rmi4_data);
 	else
@@ -5414,34 +5438,20 @@ static int synaptics_rmi4_suspend(struct device *dev)
 {
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 
-#ifdef CONFIG_TOUCH_WAKE
-	// Don't change state if touchwake handles this
-	if (!touchwake_is_active()) {
-		#ifdef TOUCHWAKE_DEBUG_PRINT
-		pr_info("[TOUCHWAKE] Synaptics suspend\n");
-		#endif
-#endif
-		dev_dbg(&rmi4_data->i2c_client->dev, "%s\n", __func__);
+	dev_dbg(&rmi4_data->i2c_client->dev, "%s\n", __func__);
 
-		if (rmi4_data->staying_awake) {
-			dev_info(&rmi4_data->i2c_client->dev, "%s : return due to staying_awake\n",
-					__func__);
-			return 0;
-		}
-
-		mutex_lock(&rmi4_data->input_dev->mutex);
-
-		if (rmi4_data->input_dev->users)
-			synaptics_rmi4_stop_device(rmi4_data);
-
-		mutex_unlock(&rmi4_data->input_dev->mutex);
-#ifdef CONFIG_TOUCH_WAKE
-	} else {
-		#ifdef TOUCHWAKE_DEBUG_PRINT
-		pr_info("[TOUCHWAKE] Synaptics suspend not allowed at the moment\n");
-		#endif
+	if (rmi4_data->staying_awake) {
+		dev_info(&rmi4_data->i2c_client->dev, "%s : return due to staying_awake\n",
+				__func__);
+		return 0;
 	}
-#endif
+
+	mutex_lock(&rmi4_data->input_dev->mutex);
+
+	if (rmi4_data->input_dev->users)
+		synaptics_rmi4_stop_device(rmi4_data);
+
+	mutex_unlock(&rmi4_data->input_dev->mutex);
 
 	return 0;
 }
@@ -5461,11 +5471,6 @@ static int synaptics_rmi4_resume(struct device *dev)
 	int retval;
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 
-#ifdef CONFIG_TOUCH_WAKE
-	#ifdef TOUCHWAKE_DEBUG_PRINT
-	pr_info("[TOUCHWAKE] Synaptics resume\n");
-	#endif
-#endif
 	dev_dbg(&rmi4_data->i2c_client->dev, "%s\n", __func__);
 
 	mutex_lock(&rmi4_data->input_dev->mutex);
@@ -5491,7 +5496,7 @@ void touchscreen_disable(void)
 	#endif
 
 	if (touchwake_data != NULL)
-		synaptics_rmi4_suspend(&touchwake_data->i2c_client->dev);
+		synaptics_rmi4_input_close(touchwake_data->input_dev);
 
 	return;
 }
@@ -5504,7 +5509,7 @@ void touchscreen_enable(void)
 	#endif
 
 	if (touchwake_data != NULL)
-		synaptics_rmi4_resume(&touchwake_data->i2c_client->dev);
+		synaptics_rmi4_input_open(touchwake_data->input_dev);
 
 	return;
 }
