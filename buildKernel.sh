@@ -9,7 +9,7 @@ PROPER=`echo $1 | sed 's/\([a-z]\)\([a-zA-Z0-9]*\)/\u\1\2/g'`
 HANDLE=TwistedZero
 KERNELSPEC=/Volumes/android/trltetmo-kernel
 KERNELREPO=$DROPBOX_SERVER/TwistedServer/Playground/kernels
-TOOLCHAIN_PREFIX=/Volumes/android/android-toolchain-eabi/bin/arm-eabi-
+TOOLCHAIN_PREFIX=/Volumes/android/android-toolchain-eabi-4.7/bin/arm-eabi-
 MODULEOUT=$KERNELSPEC/buildimg/boot.img-ramdisk
 GOOSERVER=loungekatt@upload.goo.im:public_html
 PUNCHCARD=`date "+%m-%d-%Y_%H.%M"`
@@ -30,8 +30,8 @@ rm -R $KERNELSPEC/buildimg/zImage
 fi
 
 mkdir $(pwd)/out
-make -C $(pwd) O=$(pwd)/out VARIANT_DEFCONFIG=apq8084_sec_trlte_tmo_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
-make -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$TOOLCHAIN_PREFIX
+make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out VARIANT_DEFCONFIG=apq8084_sec_trlte_tmo_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
+make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$TOOLCHAIN_PREFIX
 cp $(pwd)/out/arch/arm/boot/zImage $(pwd)/arch/arm/boot/zImage
 
 if [ -e arch/arm/boot/zImage ]; then
@@ -106,5 +106,7 @@ if [ -e arch/arm/boot/zImage ]; then
     scp -P 2222 $KERNELREPO/gooserver/$KERNELFILE.md5 $GOOSERVER/trltetmo/boot
     rm -R $KERNELREPO/gooserver/$KERNELFILE.md5
 #fi
+
+fi
 
 cd $KERNELSPEC
