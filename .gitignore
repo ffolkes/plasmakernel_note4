@@ -87,3 +87,4 @@ arch/arm/boot/compressed/piggy.xzkern
 */*.zip
 
 0
+out
