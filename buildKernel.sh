@@ -83,7 +83,7 @@ if [ -e arch/arm/boot/zImage ]; then
 
     cp -r  output/boot.img $KERNELREPO/trltetmo/boot.img
     cp -r  $KERNELREPO/trltetmo/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-    scp -P 2222 $KERNELREPO/gooserver/$IMAGEFILE $GOOSERVER/trltetmo/boot
+    scp -P 22 $KERNELREPO/gooserver/$IMAGEFILE $GOOSERVER/trltetmo/kernel
 
     if cat /etc/issue | grep Ubuntu; then
         tar -H ustar -c output/boot.img > output/boot.tar
@@ -92,7 +92,7 @@ if [ -e arch/arm/boot/zImage ]; then
     fi
     cp -r output/boot.tar $KERNELREPO/trltetmo/boot.tar
     cp -r $KERNELREPO/trltetmo/boot.tar $KERNELREPO/gooserver/$KERNELFILE
-    scp -P 2222 $KERNELREPO/gooserver/$KERNELFILE $GOOSERVER/trltetmo/boot
+    scp -P 22 $KERNELREPO/gooserver/$KERNELFILE $GOOSERVER/trltetmo/kernel
     rm -R $KERNELREPO/gooserver/$KERNELFILE
     cp -r output/boot.tar output/boot.tar.md5
     if cat /etc/issue | grep Ubuntu; then
@@ -103,7 +103,7 @@ if [ -e arch/arm/boot/zImage ]; then
 # gzip output/boot.tar.md5 -c -v > output/boot.tar.md5.gz
     cp -r output/boot.tar.md5 $KERNELREPO/trltetmo/boot.tar.md5
     cp -r $KERNELREPO/trltetmo/boot.tar.md5 $KERNELREPO/gooserver/$KERNELFILE.md5
-    scp -P 2222 $KERNELREPO/gooserver/$KERNELFILE.md5 $GOOSERVER/trltetmo/boot
+    scp -P 22 $KERNELREPO/gooserver/$KERNELFILE.md5 $GOOSERVER/trltetmo/kernel
     rm -R $KERNELREPO/gooserver/$KERNELFILE.md5
 #fi
 
