@@ -29,35 +29,14 @@ if [ -e $KERNELSPEC/buildimg/zImage ]; then
 rm -R $KERNELSPEC/buildimg/zImage
 fi
 
+cp -R config/apq8084_sec_trlte_tmo_defconfig  arch/arm/configs/apq8084_sec_trlte_tmo_defconfig
+
 mkdir $(pwd)/out
 make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out VARIANT_DEFCONFIG=apq8084_sec_trlte_tmo_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
 make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$TOOLCHAIN_PREFIX
 cp $(pwd)/out/arch/arm/boot/zImage $(pwd)/arch/arm/boot/zImage
 
 if [ -e arch/arm/boot/zImage ]; then
-
-    if [ `find . -name "*.ko" | grep -c ko` > 0 ]; then
-
-        find . -name "*.ko" | xargs ${TOOLCHAIN_PREFIX}strip --strip-unneeded
-
-        if [ ! -d $MODULEOUT ]; then
-            mkdir $MODULEOUT
-        fi
-        if [ ! -d $MODULEOUT/lib ]; then
-            mkdir $MODULEOUT/lib
-        fi
-        if [ ! -d $MODULEOUT/lib/modules ]; then
-            mkdir $MODULEOUT/lib/modules
-        else
-            rm -r $MODULEOUT/lib/modules
-            mkdir $MODULEOUT/lib/modules
-        fi
-
-        for j in $(find . -name "*.ko"); do
-            cp -R "${j}" $MODULEOUT/lib/modules
-        done
-
-    fi
 
     cp -R arch/arm/boot/zImage buildimg
 
@@ -83,16 +62,18 @@ if [ -e arch/arm/boot/zImage ]; then
 
     cp -r  output/boot.img $KERNELREPO/trltetmo/boot.img
     cp -r  $KERNELREPO/trltetmo/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-    scp -P 22 $KERNELREPO/gooserver/$IMAGEFILE $GOOSERVER/trltetmo/kernel
+    scp $KERNELREPO/gooserver/$IMAGEFILE $GOOSERVER/trltetmo/kernel
 
-    if cat /etc/issue | grep Ubuntu; then
-        tar -H ustar -c output/boot.img > output/boot.tar
-    else
-        tar --format ustar -c output/boot.img > output/boot.tar
-    fi
+#    if cat /etc/issue | grep Ubuntu; then
+#        tar -H ustar -c output/boot.img > output/boot.tar
+#    else
+#        tar --format ustar -c output/boot.img > output/boot.tar
+#    fi
+    tar cvf output/boot.tar output/boot.img
+    rm -R $KERNELREPO/gooserver/$IMAGEFILE
     cp -r output/boot.tar $KERNELREPO/trltetmo/boot.tar
     cp -r $KERNELREPO/trltetmo/boot.tar $KERNELREPO/gooserver/$KERNELFILE
-    scp -P 22 $KERNELREPO/gooserver/$KERNELFILE $GOOSERVER/trltetmo/kernel
+    scp $KERNELREPO/gooserver/$KERNELFILE $GOOSERVER/trltetmo/kernel
     rm -R $KERNELREPO/gooserver/$KERNELFILE
     cp -r output/boot.tar output/boot.tar.md5
     if cat /etc/issue | grep Ubuntu; then
@@ -103,7 +84,7 @@ if [ -e arch/arm/boot/zImage ]; then
 # gzip output/boot.tar.md5 -c -v > output/boot.tar.md5.gz
     cp -r output/boot.tar.md5 $KERNELREPO/trltetmo/boot.tar.md5
     cp -r $KERNELREPO/trltetmo/boot.tar.md5 $KERNELREPO/gooserver/$KERNELFILE.md5
-    scp -P 22 $KERNELREPO/gooserver/$KERNELFILE.md5 $GOOSERVER/trltetmo/kernel
+    scp $KERNELREPO/gooserver/$KERNELFILE.md5 $GOOSERVER/trltetmo/kernel
     rm -R $KERNELREPO/gooserver/$KERNELFILE.md5
 #fi
 
