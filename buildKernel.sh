@@ -34,11 +34,10 @@ cp -R config/apq8084_sec_trlte_tmo_defconfig  arch/arm/configs/apq8084_sec_trlte
 mkdir $(pwd)/out
 make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out VARIANT_DEFCONFIG=apq8084_sec_trlte_tmo_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
 make -j$CPU_JOB_NUM -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$TOOLCHAIN_PREFIX
-cp $(pwd)/out/arch/arm/boot/zImage $(pwd)/arch/arm/boot/zImage
 
-if [ -e arch/arm/boot/zImage ]; then
+if [ -e $(pwd)/out/arch/arm/boot/zImage ]; then
 
-    cp -R arch/arm/boot/zImage buildimg
+    cp -R $(pwd)/out/arch/arm/boot/zImage $KERNELSPEC/buildimg/zImage
 
     cd buildimg
     ./img.sh
