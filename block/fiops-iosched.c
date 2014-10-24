@@ -2,6 +2,7 @@
  * IOPS based IO scheduler. Based on CFQ.
  *  Copyright (C) 2003 Jens Axboe <axboe@kernel.dk>
  *  Shaohua Li <shli@kernel.org>
+ *            (C) 2014 LoungeKatt <twistedumbrella@gmail.com>
  */
 #include <linux/module.h>
 #include <linux/slab.h>
