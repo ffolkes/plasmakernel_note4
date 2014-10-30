@@ -66,7 +66,7 @@ if [ -e $KERNELSPEC/trlteSKU/$LOCALZIP ];then
     rm -R $KERNELSPEC/trlteSKU/$LOCALZIP
 fi
 
-cp -R config/trlte_`echo $TYPE`_defconfig arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
+cat config/trlte_`echo $TYPE`_defconfig config/trlte_gen_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
 cp -R config/apq8084_defconfig  arch/arm/configs/apq8084_sec_defconfig
 
 make -j$CPU_JOB_NUM -C $(pwd) clean
