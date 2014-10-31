@@ -18,7 +18,7 @@ MODULEOUT=$KERNELSPEC/buildimg/boot.`echo $TYPE`-ramdisk
 KERNELHOST=public_html/trlte`echo $TYPE`/kernel
 GOOSERVER=upload.goo.im:$KERNELHOST
 IMAGEFILE=boot-`echo $TYPE`.$PUNCHCARD.img
-KERNELFILE=boot-`echo $TYPE`.$PUNCHCARD.tar
+# KERNELFILE=boot-`echo $TYPE`.$PUNCHCARD.tar
 LOCALZIP=`echo $HANDLE"_StarKissed-trlte["$TYPE"."$BUILD"].zip"`
 KERNELZIP=`echo "StarKissed-"$PUNCHCARD"-trlte["$TYPE"."$BUILD"].zip"`
 
@@ -100,16 +100,16 @@ if [ -e arch/arm/boot/zImage ]; then
 #    else
 #        tar --format ustar -c output/boot.img > output/boot.tar
 #    fi
-    tar cvf output/boot.tar output/boot.img
-    cp -r output/boot.tar $KERNELREPO/trlte`echo $TYPE`/boot.tar
-    cp -r output/boot.tar output/boot.tar.md5
-    if cat /etc/issue | grep Ubuntu; then
-        md5sum -t output/boot.tar.md5 >> output/boot.tar.md5
-    else
-        md5 -r output/boot.tar.md5 >> output/boot.tar.md5
-    fi
+    # tar cvf output/boot.tar output/boot.img
+    # cp -r output/boot.tar $KERNELREPO/trlte`echo $TYPE`/boot.tar
+    # cp -r output/boot.tar output/boot.tar.md5
+    # if cat /etc/issue | grep Ubuntu; then
+    #     md5sum -t output/boot.tar.md5 >> output/boot.tar.md5
+    # else
+    #     md5 -r output/boot.tar.md5 >> output/boot.tar.md5
+    # fi
 
-    cp -r output/boot.tar.md5 $KERNELREPO/trlte`echo $TYPE`/boot.tar.md5
+    # cp -r output/boot.tar.md5 $KERNELREPO/trlte`echo $TYPE`/boot.tar.md5
     cp -R output/boot.img skrecovery
     cd skrecovery
     rm *.zip
@@ -122,8 +122,8 @@ if [ -e arch/arm/boot/zImage ]; then
             rm -R $KERNELREPO/gooserver/*.{img,tar,md5,zip}
         fi
         cp -r  $KERNELREPO/trlte`echo $TYPE`/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-        cp -r $KERNELREPO/trlte`echo $TYPE`/boot.tar $KERNELREPO/gooserver/$KERNELFILE
-        cp -r $KERNELREPO/trlte`echo $TYPE`/boot.tar.md5 $KERNELREPO/gooserver/$KERNELFILE.md5
+        # cp -r $KERNELREPO/trlte`echo $TYPE`/boot.tar $KERNELREPO/gooserver/$KERNELFILE
+        # cp -r $KERNELREPO/trlte`echo $TYPE`/boot.tar.md5 $KERNELREPO/gooserver/$KERNELFILE.md5
         cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
     fi
 
@@ -201,17 +201,16 @@ a)
     TYPE=att
     BUILD=NIE
     buildKernel
+    if [ $publish == "y" ] && [ 0 == 1 ] ; then
+        if [ -e starkissed/StarKissed-Aroma-trlte_kernel.zip ];then
+            rm -R starkissed/StarKissed-Aroma-trlte_kernel.zip
+        fi
+        cd starkissed
+        zip -r StarKissed-Aroma-trlte_kernel.zip *
+        cp -R StarKissed-Aroma-trlte_kernel.zip $KERNELREPO/StarKissed-Aroma-trlte_kernel.zip
+    fi
     exit
 ;;
 esac
-
-if [ 0 == 1 ]; then
-    if [ -e starkissed/StarKissed-Aroma-trlte_kernel.zip ];then
-        rm -R starkissed/StarKissed-Aroma-trlte_kernel.zip
-    fi
-    cd starkissed
-    zip -r StarKissed-Aroma-trlte_kernel.zip *
-    cp -R StarKissed-Aroma-trlte_kernel.zip $KERNELREPO/StarKissed-Aroma-trlte_kernel.zip
-fi
 
 cd $KERNELSPEC
