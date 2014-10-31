@@ -155,31 +155,31 @@ case $profile in
     exit
 ;;
 2)
-    TYPE=att
-    BUILD=NA
-    buildKernel
-    exit
-;;
-3)
-    TYPE=vzw
-    BUILD=NI1
-    buildKernel
-    exit
-;;
-4)
     TYPE=spr
     BUILD=NIE
     buildKernel
     exit
 ;;
-5)
+3)
     TYPE=can
     BUILD=NJ3
     buildKernel
     exit
 ;;
-6)
+4)
+    TYPE=vzw
+    BUILD=NI1
+    buildKernel
+    exit
+;;
+5)
     TYPE=usc
+    BUILD=NA
+    buildKernel
+    exit
+;;
+6)
+    TYPE=att
     BUILD=NA
     buildKernel
     exit
