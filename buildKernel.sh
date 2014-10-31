@@ -41,7 +41,7 @@ if [ -e $KERNELSPEC/trlteSKU/$LOCALZIP ];then
 fi
 
 cat config/trlte_`echo $TYPE`_defconfig config/trlte_gen_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
-cp -R config/apq8084_defconfig  arch/arm/configs/apq8084_sec_defconfig
+cp -R config/trlte_sec_defconfig  arch/arm/configs/apq8084_sec_defconfig
 cp -R buildimg/boot.gen-ramdisk/* $MODULEOUT/
 
 make -j$CPU_JOB_NUM -C $(pwd) clean
