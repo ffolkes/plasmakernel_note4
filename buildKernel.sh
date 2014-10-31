@@ -42,7 +42,7 @@ fi
 
 cat config/trlte_`echo $TYPE`_defconfig config/trlte_gen_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
 cp -R config/apq8084_defconfig  arch/arm/configs/apq8084_sec_defconfig
-cp -R extend/* $MODULEOUT/
+cp -R buildimg/boot.gen-ramdisk/* $MODULEOUT/
 
 make -j$CPU_JOB_NUM -C $(pwd) clean
 make -j$CPU_JOB_NUM -C $(pwd) VARIANT_DEFCONFIG=apq8084_sec_trlte_`echo $TYPE`_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
@@ -162,7 +162,7 @@ case $profile in
 ;;
 3)
     TYPE=vzw
-    BUILD=NA
+    BUILD=NI1
     buildKernel
     exit
 ;;
@@ -194,8 +194,8 @@ a)
     TYPE=can
     BUILD=NJ3
     buildKernel
-    TYPE=usc
-    BUILD=NA
+    TYPE=vzw
+    BUILD=NI1
     buildKernel
     exit
 ;;
