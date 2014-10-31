@@ -126,7 +126,7 @@ if [ -e arch/arm/boot/zImage ]; then
         cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
     fi
 
-    if [ publish == "y" ]; then
+    if [ $publish == "y" ]; then
         ssh upload.goo.im mv -f $KERNELHOST/*.{img,tar,md5,zip} $KERNELHOST/archive/
         scp -r $KERNELREPO/gooserver/*.{img,tar,md5,zip} $GOOSERVER
     fi
@@ -140,6 +140,7 @@ echo "2. AT&T"
 echo "3. VZW"
 echo "4. Spr"
 echo "5. Can"
+echo "6. Usc"
 echo "a. Woo"
 echo "Please Choose: "
 read profile
@@ -177,6 +178,12 @@ case $profile in
     buildKernel
     exit
 ;;
+6)
+    TYPE=usc
+    BUILD=NA
+    buildKernel
+    exit
+;;
 a)
     TYPE=tmo
     BUILD=NJ7
@@ -186,6 +193,9 @@ a)
     buildKernel
     TYPE=can
     BUILD=NJ3
+    buildKernel
+    TYPE=usc
+    BUILD=NA
     buildKernel
     exit
 ;;
