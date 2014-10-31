@@ -135,13 +135,13 @@ fi
 
 }
 
-echo "1. T-Mo"
+echo "1. T-Mobile"
 echo "2. AT&T"
-echo "3. VZW"
-echo "4. Spr"
-echo "5. Can"
-echo "6. Usc"
-echo "a. Woo"
+echo "3. Verizon"
+echo "4. Sprint"
+echo "5. Canadian"
+echo "6. US Cellular"
+echo "a. Circus"
 echo "Please Choose: "
 read profile
 echo "Publish Kernel?"
