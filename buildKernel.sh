@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Copyright (C) 2011 Twisted Playground
+# Copyright (C) 2013 LoungeKatt
 
-# This script is designed by Twisted Playground for use on MacOSX 10.7 but can be modified for other distributions of Mac and Linux
+# This script is designed by Twisted Playground / LoungeKatt for use on MacOSX 10.7 but can be modified for other distributions of Mac and Linux
 
 HANDLE=LoungeKatt
 KERNELSPEC=/Volumes/android/starkissed-kernel-trlte
