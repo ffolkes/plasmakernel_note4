@@ -36,8 +36,8 @@ fi
 if [ -e arch/arm/boot/zImage ]; then
     rm -R arch/arm/boot/zImage
 fi
-if [ -e $KERNELSPEC/trlteSKU/$LOCALZIP ];then
-    rm -R $KERNELSPEC/trlteSKU/$LOCALZIP
+if [ -e $KERNELSPEC/skrecovery/$LOCALZIP ];then
+    rm -R $KERNELSPEC/skrecovery/$LOCALZIP
 fi
 
 cat config/trlte_`echo $TYPE`_defconfig config/trlte_gen_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
@@ -93,6 +93,7 @@ if [ -e arch/arm/boot/zImage ]; then
     fi
 
     cp -r  output/boot.img $KERNELREPO/trlte`echo $TYPE`/boot.img
+    cp -r  output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
 
 #    if cat /etc/issue | grep Ubuntu; then
 #        tar -H ustar -c output/boot.img > output/boot.tar
@@ -109,12 +110,12 @@ if [ -e arch/arm/boot/zImage ]; then
     fi
 
     cp -r output/boot.tar.md5 $KERNELREPO/trlte`echo $TYPE`/boot.tar.md5
-    cp -R output/boot.img trlteSKU
-    cd trlteSKU
+    cp -R output/boot.img skrecovery
+    cd skrecovery
     rm *.zip
     zip -r $LOCALZIP *
     cd ../
-    cp -R $KERNELSPEC/trlteSKU/$LOCALZIP $KERNELREPO/$LOCALZIP
+    cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
 
     if [ $publish == "y" ] || [ $publish == "m" ] ; then
         if [ -e $KERNELREPO/gooserver/ ]; then
@@ -180,7 +181,7 @@ case $profile in
 ;;
 6)
     TYPE=att
-    BUILD=NA
+    BUILD=NIE
     buildKernel
     exit
 ;;
@@ -197,8 +198,20 @@ a)
     TYPE=vzw
     BUILD=NI1
     buildKernel
+    TYPE=att
+    BUILD=NIE
+    buildKernel
     exit
 ;;
 esac
+
+if [ 0 == 1 ]; then
+    if [ -e starkissed/StarKissed-Aroma-trlte_kernel.zip ];then
+        rm -R starkissed/StarKissed-Aroma-trlte_kernel.zip
+    fi
+    cd starkissed
+    zip -r StarKissed-Aroma-trlte_kernel.zip *
+    cp -R StarKissed-Aroma-trlte_kernel.zip $KERNELREPO/StarKissed-Aroma-trlte_kernel.zip
+fi
 
 cd $KERNELSPEC
