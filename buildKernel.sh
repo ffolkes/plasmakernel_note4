@@ -137,11 +137,11 @@ fi
 }
 
 echo "1. T-Mobile"
-echo "2. AT&T"
-echo "3. Verizon"
-echo "4. Sprint"
-echo "5. Canadian"
-echo "6. US Cellular"
+echo "2. Sprint"
+echo "3. Canadian"
+echo "4. Verizon"
+echo "5. US Cellular"
+echo "6. AT&T"
 echo "a. Circus"
 echo "Please Choose: "
 read profile
