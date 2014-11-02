@@ -29,6 +29,7 @@ on fs
     chown system system /persdata/absolute 
     chmod 0750 /persdata/absolute
 					
+
 on post-fs-data
 #Private Mode
     mkdir /data/privatemode 0770 system system
@@ -38,6 +39,19 @@ on post-fs-data
 on boot
 # Fingerprint
     mkdir /dev/validity 0770 system system
+
+###############################################################################
+# System LSI
+# Comment : add permission to device driver
+
+# NFC : Permissions for NFC
+    chmod 0660 /dev/sec-nfc
+# NFC : change owner
+    chown nfc nfc /dev/sec-nfc
+# NFC : create data/nfc for nv storage
+    mkdir /data/nfc 0700 nfc nfc
+    mkdir /data/nfc/param 0700 nfc nfc
+##############################################################################
 
 # permissions for bluetooth.
     setprop ro.bt.bdaddr_path "/efs/bluetooth/bt_addr"
@@ -56,64 +70,34 @@ on boot
     chmod 0600 /dev/btlock
     chown bluetooth bluetooth /dev/btlock
 
-# Define TCP buffer sizes for various networks
-#   ReadMin, ReadInitial, ReadMax, WriteMin, WriteInitial, WriteMax,
-    setprop net.tcp.buffersize.default 6144,131070,1056768,6144,24576,165312
-    setprop net.tcp.buffersize.wifi    524288,1048576,4525824,524288,1048576,4525824
-    setprop net.tcp.buffersize.lte     786432,1572864,3840000,786432,1572864,3840000
-    setprop net.tcp.buffersize.umts    6141,131070,1056768,6144,24576,165312
-    setprop net.tcp.buffersize.hspa    6141,131070,1056768,6144,24576,393216
-    setprop net.tcp.buffersize.hsupa   6141,131070,1056768,6144,24576,393216
-    setprop net.tcp.buffersize.hsdpa   6141,131070,1056768,6144,24576,393216
-    setprop net.tcp.buffersize.hspap   6141,131070,1830912,6144,24576,1830912
-    setprop net.tcp.buffersize.edge    6140,39420,52560,6144,24576,52560
-    setprop net.tcp.buffersize.gprs    6138,45000,45000,6144,13140,17520
-    setprop net.tcp.buffersize.evdo    6141,131070,393216,6144,24576,393216
+# bluetooth dhcp config
 
 # SSWAP
     write /proc/sys/vm/swappiness 130
 
-# IPSec for VOLTE
-    chown root system /dev/socket
-    chmod 0775 /dev/socket
-
-###############################################################################
-# System LSI
-# Comment : add permission to device driver
-
-# NFC : Permissions for NFC
-    chmod 0660 /dev/sec-nfc
-# NFC : change owner
-    chown nfc nfc /dev/sec-nfc
-# NFC : create data/nfc for nv storage
-    mkdir /data/nfc 0700 nfc nfc
-    mkdir /data/nfc/param 0700 nfc nfc
-##############################################################################
-
 # TODO: replace it with device's DEXPREOPT_BOOT_JARS
-
-
-#InsideSecure VPN Client
-service vpnclientpm /system/bin/vpnclientpm -u 1000 -g 1000 \
-     -O /data/data/com.ipsec.service/vpnclientpm.txt \
-     -U rmnet,rmnet_usb,wlan,bt-pan,rndis,p2p,eth
-      socket vpnclientpm seqpacket 0600 system system
-      disabled
-on property:service.vpnclientpm.enable=1
-      start vpnclientpm
-on property:service.vpnclientpm.enable=0
-      stop vpnclientpm
-
-# IPSec for VOLTE
-service ipsec-daemon /system/bin/IPSecService
-    class main
-    socket ipsec_socket stream 660 system system
-    user system
-    group system net_raw inet net_admin
 
 #Private Mode
 service privatemode /system/bin/sdcard /data/privatemode /mnt/shell/privatemode 1000 1000
     class late_start
+    oneshot
+
+#Define TCP buffer sizes changing by uscc req.
+    setprop net.tcp.buffersize.evdo    4096,65535,65535,4096,65535,65535
+    setprop net.tcp.buffersize.1xrtt   4096,65535,65535,4096,65535,65535
+
+#RIL wants to change tcp_window_scaling
+on property:ril.tws=1
+    write /proc/sys/net/ipv4/tcp_window_scaling 1
+on property:ril.tws=0
+    write /proc/sys/net/ipv4/tcp_window_scaling 0  
+
+# SSWAP
+service swapon /sbin/sswap -s
+    class core
+    user root
+    group root
+    seclabel u:r:sswap:s0
     oneshot
 
 # bootchecker
@@ -127,15 +111,7 @@ service bootchecker /system/bin/bootchecker
 service vcsFPService /system/bin/vcsFPService
     class late_start
     user system
-    group system      
-
-# SSWAP
-service swapon /sbin/sswap -s
-    class core
-    user root
-    group root
-    seclabel u:r:sswap:s0
-    oneshot
+    group system
 
 on property:init.svc.bootanim=stopped
 # permission for Input Device(Touchkey).
