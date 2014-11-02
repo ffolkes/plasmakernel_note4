@@ -146,7 +146,7 @@ buildAroma () {
 
 echo "1. Deported"
 echo "2. StarKissed"
-echo "3. Publish"
+echo "3. Package"
 echo "4. Carrier"
 echo "Please Choose: "
 read profile
