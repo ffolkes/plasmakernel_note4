@@ -95,19 +95,21 @@ if [ -e arch/arm/boot/zImage ]; then
         rm -R output/boot.tar.md5.gz
     fi
 
-    cp -r  output/boot.img $KERNELREPO/trlte`echo $TYPE`/boot.img
-    cp -r  output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
-    cp -R output/boot.img skrecovery/kernel/`echo $TYPE`/boot.img
+    if [ `echo $TYPE` == "sku" ]; then
+        cp -r  output/boot.img $KERNELREPO/trltesku/boot.img
+        if [ $publish == "y" ]; then
+            if [ -e $KERNELREPO/gooserver/ ]; then
+                rm -R $KERNELREPO/gooserver/*.img
+            fi
+            cp -r  $KERNELREPO/trltesku/boot.img $KERNELREPO/gooserver/$IMAGEFILE
 
-    if [ $publish == "y" ]; then
-        if [ -e $KERNELREPO/gooserver/ ]; then
-            rm -R $KERNELREPO/gooserver/*.img
+            existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
+            scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
+            ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
         fi
-        cp -r  $KERNELREPO/trlte`echo $TYPE`/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-
-        existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
-        scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
-        ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
+    else
+        cp -r output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
+        cp -r output/boot.img skrecovery/kernel/`echo $TYPE`/boot.img
     fi
 
 fi
@@ -122,7 +124,7 @@ buildAroma () {
     cd ../
     cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
 
-    if [ $publish == "m" ]; then
+    if [ $publish == "y" ]; then
         if [ -e $KERNELREPO/gooserver/ ]; then
             rm -R $KERNELREPO/gooserver/*.zip
         fi
@@ -142,67 +144,24 @@ buildAroma () {
 
 }
 
-echo "1. T-Mobile"
-echo "2. Sprint"
-echo "3. Canadian"
-echo "4. Verizon"
-echo "5. US Cellular"
-echo "6. AT&T"
-echo "s. StarKissed"
-echo "a. Circus"
-echo "z. Aroma"
+echo "1. Deported"
+echo "2. StarKissed"
+echo "3. Publish"
+echo "4. Carrier"
 echo "Please Choose: "
 read profile
-echo "Publish Kernel?"
-read publish
 
 case $profile in
 1)
-    TYPE=tmo
-    BUILD=NJ7
+    echo "Publish Image?"
+    read publish
+    TYPE=sku
     buildKernel
     exit
 ;;
 2)
-    TYPE=spr
-    BUILD=NIE
-    buildKernel
-    exit
-;;
-3)
-    TYPE=can
-    BUILD=NJ3
-    buildKernel
-    exit
-;;
-4)
-    TYPE=vzw
-    BUILD=NI1
-    buildKernel
-    exit
-;;
-5)
-    TYPE=usc
-    BUILD=NA
-    buildKernel
-    exit
-;;
-6)
-    TYPE=att
-    BUILD=NIE
-    buildKernel
-    exit
-;;
-s)
-    TYPE=sku
-    BUILD=SKU
-    buildKernel
-    exit
-;;
-a)
-    if [ $publish == "y" ]; then
-        publish="m"
-    fi
+    echo "Publish Package?"
+    read publish
     TYPE=tmo
     BUILD=NJ7
     buildKernel
@@ -218,11 +177,23 @@ a)
     TYPE=att
     BUILD=NIE
     buildKernel
+    TYPE=usc
+    BUILD=NA
+    buildKernel
     buildAroma
     exit
 ;;
-z)
+3)
+    echo "Publish Package?"
+    read publish
     buildAroma
+    exit
+;;
+4)
+    echo "Which Carrier?"
+    read carrier
+    TYPE=$carrier
+    buildKernel
     exit
 ;;
 esac
