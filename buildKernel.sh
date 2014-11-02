@@ -10,8 +10,10 @@ KERNELSPEC=/Volumes/android/starkissed-kernel-trlte
 KERNELREPO=$DROPBOX_SERVER/TwistedServer/Playground/kernels
 TOOLCHAIN_PREFIX=/Volumes/android/android-toolchain-eabi-4.7/bin/arm-eabi-
 PUNCHCARD=`date "+%m-%d-%Y_%H.%M"`
-LOCALZIP=$HANDLE"_StarKissed-trlte.zip"
-KERNELZIP="StarKissed-"$PUNCHCARD"-trlte.zip"
+LOCALZIP=$HANDLE"_StarKissed-trlte[Auto].zip"
+KERNELZIP="StarKissed-"$PUNCHCARD"-trlte[Auto].zip"
+AROMAZIP=$HANDLE"_StarKissed-trlte[Aroma].zip"
+AROMAHOST="StarKissed-"$PUNCHCARD"-trlte[Aroma].zip"
 
 buildKernel () {
 
@@ -97,21 +99,46 @@ if [ -e arch/arm/boot/zImage ]; then
     cp -r  output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
     cp -R output/boot.img skrecovery/kernel/`echo $TYPE`/boot.img
 
-    if [ $publish == "y" ] || [ $publish == "m" ] ; then
+    if [ $publish == "y" ]; then
         if [ -e $KERNELREPO/gooserver/ ]; then
             rm -R $KERNELREPO/gooserver/*.img
         fi
         cp -r  $KERNELREPO/trlte`echo $TYPE`/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-        cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
-    fi
 
-    if [ $publish == "y" ]; then
         existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
         scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
         ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
     fi
 
 fi
+
+}
+
+buildAroma () {
+
+    cd skrecovery
+    rm *.zip
+    zip -r $LOCALZIP *
+    cd ../
+    cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
+
+    if [ $publish == "m" ]; then
+        if [ -e $KERNELREPO/gooserver/ ]; then
+            rm -R $KERNELREPO/gooserver/*.zip
+        fi
+        cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
+
+        existing=`ssh upload.goo.im ls public_html/trltesku/kernel/*.zip`
+        scp -r $KERNELREPO/gooserver/*.zip $GOOSERVER
+        ssh upload.goo.im mv -t public_html/trltesku/kernel/archive/ $existing
+    fi
+    if [ -e starkissed/$AROMAZIP ];then
+        rm -R starkissed/$AROMAZIP
+    fi
+    cd starkissed
+    zip -r $AROMAZIP *
+    cd ../
+    cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
 
 }
 
@@ -173,6 +200,9 @@ s)
     exit
 ;;
 a)
+    if [ $publish == "y" ]; then
+        publish="m"
+    fi
     TYPE=tmo
     BUILD=NJ7
     buildKernel
@@ -188,33 +218,11 @@ a)
     TYPE=att
     BUILD=NIE
     buildKernel
+    buildAroma
     exit
 ;;
 z)
-    cd skrecovery
-    rm *.zip
-    zip -r $LOCALZIP *
-    cd ../
-    cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
-
-    if [ $publish == "y" ] || [ $publish == "m" ] ; then
-        if [ -e $KERNELREPO/gooserver/ ]; then
-            rm -R $KERNELREPO/gooserver/*.zip
-        fi
-        cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
-    fi
-
-    if [ $publish == "y" ]; then
-        existing=`ssh upload.goo.im ls public_html/trltesku/kernel/*.zip`
-        scp -r $KERNELREPO/gooserver/*.zip $GOOSERVER
-        ssh upload.goo.im mv -t public_html/trltesku/kernel/archive/ $existing
-    fi
-    if [ -e starkissed/StarKissed-Aroma-trlte_kernel.zip ];then
-        rm -R starkissed/StarKissed-Aroma-trlte_kernel.zip
-    fi
-    cd starkissed
-    zip -r StarKissed-Aroma-trlte_kernel.zip *
-    cp -R StarKissed-Aroma-trlte_kernel.zip $KERNELREPO/StarKissed-Aroma-trlte_kernel.zip
+    buildAroma
     exit
 ;;
 esac
