@@ -6,7 +6,7 @@
 # This script is designed by Twisted Playground / LoungeKatt for use on MacOSX 10.7 but can be modified for other distributions of Mac and Linux
 
 HANDLE=LoungeKatt
-KERNELSPEC=/Volumes/android/starkissed-kernel-trlte
+KERNELSPEC=/Volumes/android/starkissed-deported
 KERNELREPO=$DROPBOX_SERVER/TwistedServer/Playground/kernels
 TOOLCHAIN_PREFIX=/Volumes/android/android-toolchain-eabi-4.7/bin/arm-eabi-
 PUNCHCARD=`date "+%m-%d-%Y_%H.%M"`
