@@ -45,6 +45,12 @@ cat config/trlte_`echo $TYPE`_defconfig config/trlte_gen_defconfig > arch/arm/co
 cp -R config/trlte_sec_defconfig  arch/arm/configs/apq8084_sec_defconfig
 cp -R buildimg/boot.gen-ramdisk/* $MODULEOUT/
 
+if [ $publish == "y" ]; then
+    starkissed Compiling
+else
+    starkissed Verifying
+fi
+
 make -j$CPU_JOB_NUM -C $(pwd) clean
 make -j$CPU_JOB_NUM -C $(pwd) VARIANT_DEFCONFIG=apq8084_sec_trlte_`echo $TYPE`_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
 make -j$CPU_JOB_NUM -C $(pwd) CROSS_COMPILE=$TOOLCHAIN_PREFIX
@@ -96,6 +102,7 @@ if [ -e arch/arm/boot/zImage ]; then
     if [ `echo $TYPE` == "sku" ]; then
         cp -r  output/boot.img $KERNELREPO/trltesku/boot.img
         if [ $publish == "y" ]; then
+            starkissed Uploading
             if [ -e $KERNELREPO/gooserver/ ]; then
                 rm -R $KERNELREPO/gooserver/*.img
             fi
@@ -112,6 +119,7 @@ if [ -e arch/arm/boot/zImage ]; then
         cp -r output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
         cp -r output/boot.img skrecovery/kernel/`echo $TYPE`/boot.img
     fi
+    starkissed Inactive
 
 fi
 
@@ -119,6 +127,11 @@ fi
 
 buildAroma () {
 
+    if [ $publish == "y" ]; then
+        starkissed Compiling
+    else
+        starkissed Verifying
+    fi
     cd skrecovery
     rm *.zip
     zip -r $LOCALZIP *
@@ -126,6 +139,7 @@ buildAroma () {
     cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
 
     if [ $publish == "y" ]; then
+        starkissed Uploading
         if [ -e $KERNELREPO/gooserver/ ]; then
             rm -R $KERNELREPO/gooserver/*.zip
         fi
@@ -145,6 +159,7 @@ buildAroma () {
     zip -r $AROMAZIP *
     cd ../
     cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
+    starkissed Inactive
 
 }
 
