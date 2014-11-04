@@ -10,7 +10,6 @@ KERNELSPEC=/Volumes/android/starkissed-deported
 KERNELREPO=$DROPBOX_SERVER/TwistedServer/Playground/kernels
 TOOLCHAIN_PREFIX=/Volumes/android/android-toolchain-eabi-4.7/bin/arm-eabi-
 PUNCHCARD=`date "+%m-%d-%Y_%H.%M"`
-MEGASERVER=mega:/trltesku/
 LOCALZIP=$HANDLE"_StarKissed-trlte[Auto].zip"
 KERNELZIP="StarKissed-"$PUNCHCARD"-trlte[Auto].zip"
 AROMAZIP=$HANDLE"_StarKissed-trlte[Aroma].zip"
@@ -20,10 +19,18 @@ buildKernel () {
 
 PROPER=`echo $TYPE | sed 's/\([a-z]\)\([a-zA-Z0-9]*\)/\u\1\2/g'`
 MODULEOUT=$KERNELSPEC/buildimg/boot.`echo $TYPE`-ramdisk
-KERNELHOST=public_html/trltesku
+if [ `echo $TYPE` == "plz" ]; then
+    MEGASERVER=mega:/trltesku/recovery/
+    KERNELHOST=public_html/trltesku/recovery
+    CARRIERIM=recovery.`echo $TYPE`.img
+    IMAGEFILE=recovery.`echo $TYPE`.$PUNCHCARD.img
+else
+    MEGASERVER=mega:/trltesku/
+    KERNELHOST=public_html/trltesku
+    CARRIERIM=boot.`echo $TYPE`.img
+    IMAGEFILE=boot.`echo $TYPE`.$PUNCHCARD.img
+fi
 GOOSERVER=upload.goo.im:$KERNELHOST
-CARRIERIM=boot.`echo $TYPE`.img
-IMAGEFILE=boot.`echo $TYPE`.$PUNCHCARD.img
 
 CPU_JOB_NUM=8
 
@@ -107,8 +114,10 @@ if [ -e arch/arm/boot/zImage ]; then
         scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
         ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
     fi
-    cp -r $KERNELREPO/trltesku/$CARRIERIM starkissed/kernel/`echo $TYPE`/boot.img
-    cp -r $KERNELREPO/trltesku/$CARRIERIM skrecovery/kernel/`echo $TYPE`/boot.img
+    if [ `echo $TYPE` != "plz" ]; then
+        cp -r $KERNELREPO/trltesku/$CARRIERIM starkissed/kernel/`echo $TYPE`/boot.img
+        cp -r $KERNELREPO/trltesku/$CARRIERIM skrecovery/kernel/`echo $TYPE`/boot.img
+    fi
     starkissed Inactive
 else
     starkissed Inactive
@@ -151,6 +160,7 @@ buildAroma () {
 echo "1. StarKissed"
 echo "2. Deported"
 echo "3. Carrier"
+echo "4. Recovery"
 echo "Please Choose: "
 read profile
 
@@ -190,6 +200,13 @@ case $profile in
     echo "Publish Image?"
     read publish
     TYPE=$carrier
+    buildKernel
+    exit
+;;
+4)
+    echo "Publish Image?"
+    read publish
+    TYPE=plz
     buildKernel
     exit
 ;;
