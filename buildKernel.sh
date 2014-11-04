@@ -52,9 +52,15 @@ if [ -e $KERNELSPEC/skrecovery/$LOCALZIP ];then
     rm -R $KERNELSPEC/skrecovery/$LOCALZIP
 fi
 
-cat config/trlte_`echo $TYPE`_defconfig config/trlte_sku_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
+if [ `echo $TYPE` == "plz" ]; then
+    cp -r config/trlte_plz_defconfig arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
+else
+    cat config/trlte_`echo $TYPE`_defconfig config/trlte_sku_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
+fi
 cp -R config/trlte_sec_defconfig  arch/arm/configs/apq8084_sec_defconfig
-cp -R buildimg/boot.sku-ramdisk/* $MODULEOUT/
+if [ `echo $TYPE` == "plz" ]; then
+    cp -R buildimg/boot.sku-ramdisk/* $MODULEOUT/
+fi
 
 if [ $publish == "y" ]; then
     starkissed Compiling
