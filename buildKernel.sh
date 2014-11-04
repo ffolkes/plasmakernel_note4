@@ -97,7 +97,9 @@ if [ -e arch/arm/boot/zImage ]; then
         fi
         cp -r  $KERNELREPO/trltesku/$CARRIERIM $KERNELREPO/gooserver/$IMAGEFILE
 
-        megacmd move mega:/trltesku/*.`echo $TYPE`.img mega:/trltesku/archive
+        for i in $(megacmd list mega:/trltesku/ 2>&1 | awk '{print $1}' | grep -i $TYPE.img); do
+            megacmd move $i mega:/trltesku/archive/$(basename $i)
+        done
         megacmd put $KERNELREPO/gooserver/*.img mega:/trltesku/
 
         existing=`ssh upload.goo.im ls $KERNELHOST/*.$TYPE.img`
@@ -128,7 +130,9 @@ buildAroma () {
         fi
         cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
 
-        megacmd move mega:/trltesku/*.zip mega:/trltesku/archive
+        for i in $(megacmd list mega:/trltesku/ 2>&1 | awk '{print $1}' | grep -i .zip); do
+            megacmd move $i mega:/trltesku/archive/$(basename $i)
+        done
         megacmd put $KERNELREPO/gooserver/*.zip mega:/trltesku/
 
 #        existing=`ssh upload.goo.im ls public_html/trltesku/kernel/*.zip`
@@ -154,7 +158,7 @@ read profile
 
 case $profile in
 1)
-    echo "Publish Package?"
+    echo "Publish Image?"
     read publish
     TYPE=tmo
     BUILD=NJ7
@@ -185,6 +189,8 @@ case $profile in
 3)
     echo "Which Carrier?"
     read carrier
+    echo "Publish Image?"
+    read publish
     TYPE=$carrier
     buildKernel
     exit
