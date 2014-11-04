@@ -97,10 +97,10 @@ if [ -e arch/arm/boot/zImage ]; then
         fi
         cp -r  $KERNELREPO/trltesku/$CARRIERIM $KERNELREPO/gooserver/$IMAGEFILE
 
-        megacmd move mega:/trltesku/*.img mega:/trltesku/archive
+        megacmd move mega:/trltesku/*.`echo $TYPE`.img mega:/trltesku/archive
         megacmd put $KERNELREPO/gooserver/*.img mega:/trltesku/
 
-        existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
+        existing=`ssh upload.goo.im ls $KERNELHOST/*.$TYPE.img`
         scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
         ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
     fi
