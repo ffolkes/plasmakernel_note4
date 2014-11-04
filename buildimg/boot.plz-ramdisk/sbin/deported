@@ -1,0 +1,12 @@
+#!/sbin/sh
+
+/sbin/busybox mount -o rw,remount /
+carrier=`getprop ro.product.device`
+if [ -e /sepolicy ]; then
+/sbin/busybox rm -rf /sepolicy
+/sbin/busybox cp -r /selinux/sepolicy-$carrier /sepolicy
+fi
+if [ -e /sepolicy_version ]; then
+/sbin/busybox rm -rf /sepolicy_version
+/sbin/busybox cp -r /selinux/sepolicy_version-$carrier /sepolicy_version
+fi
