@@ -14,6 +14,8 @@ LOCALZIP=$HANDLE"_StarKissed-trlte[Auto].zip"
 KERNELZIP="StarKissed-"$PUNCHCARD"-trlte[Auto].zip"
 AROMAZIP=$HANDLE"_StarKissed-trlte[Aroma].zip"
 AROMAHOST="StarKissed-"$PUNCHCARD"-trlte[Aroma].zip"
+PHILZZIP=$HANDLE"_Philz_Touch_6.58.9-trlte[NA].zip"
+RECOVERZIP="Philz_Touch_6.58.9-"$PUNCHCARD"-trlte[NA].zip"
 
 buildKernel () {
 
@@ -60,9 +62,9 @@ else
     starkissed Verifying
 fi
 
-make -j$CPU_JOB_NUM -C $(pwd) clean
-make -j$CPU_JOB_NUM -C $(pwd) VARIANT_DEFCONFIG=apq8084_sec_trlte_`echo $TYPE`_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
-make -j$CPU_JOB_NUM -C $(pwd) CROSS_COMPILE=$TOOLCHAIN_PREFIX
+make -j$CPU_JOB_NUM -s -C $(pwd) clean
+make -j$CPU_JOB_NUM -s -C $(pwd) VARIANT_DEFCONFIG=apq8084_sec_trlte_`echo $TYPE`_defconfig apq8084_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig CROSS_COMPILE=$TOOLCHAIN_PREFIX
+make -j$CPU_JOB_NUM -s -C $(pwd) CROSS_COMPILE=$TOOLCHAIN_PREFIX
 
 if [ -e arch/arm/boot/zImage ]; then
 
@@ -114,7 +116,27 @@ if [ -e arch/arm/boot/zImage ]; then
         scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
         ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
     fi
-    if [ `echo $TYPE` != "plz" ]; then
+    if [ `echo $TYPE` == "plz" ]; then
+        cp -r $KERNELREPO/trltesku/$CARRIERIM plzrecovery/recovery.img
+        starkissed Packaging
+        cd plzrecovery
+        rm *.zip
+        zip -r $PHILZZIP *
+        cd ../
+        cp -R $KERNELSPEC/plzrecovery/$PHILZZIP $KERNELREPO/$PHILZZIP
+        if [ $publish == "y" ]; then
+            starkissed Uploading
+            if [ -e $KERNELREPO/gooserver/ ]; then
+                rm -R $KERNELREPO/gooserver/*.zip
+            fi
+            cp -r $KERNELREPO/$PHILZZIP $KERNELREPO/gooserver/$RECOVERZIP
+
+            for i in $(megacmd list $MEGASERVER 2>&1 | awk '{print $1}' | grep -i .zip); do
+                megacmd move $i $MEGASERVER/archive/$(basename $i)
+            done
+            megacmd put $KERNELREPO/gooserver/*.zip $MEGASERVER
+        fi
+    else
         cp -r $KERNELREPO/trltesku/$CARRIERIM starkissed/kernel/`echo $TYPE`/boot.img
         cp -r $KERNELREPO/trltesku/$CARRIERIM skrecovery/kernel/`echo $TYPE`/boot.img
     fi
