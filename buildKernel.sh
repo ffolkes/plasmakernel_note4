@@ -19,9 +19,10 @@ buildKernel () {
 
 PROPER=`echo $TYPE | sed 's/\([a-z]\)\([a-zA-Z0-9]*\)/\u\1\2/g'`
 MODULEOUT=$KERNELSPEC/buildimg/boot.`echo $TYPE`-ramdisk
-KERNELHOST=public_html/trlte`echo $TYPE`/kernel
+KERNELHOST=public_html/trltesku
 GOOSERVER=upload.goo.im:$KERNELHOST
-IMAGEFILE=boot-`echo $TYPE`.$PUNCHCARD.img
+CARRIERIM=boot.`echo $TYPE`.img
+IMAGEFILE=boot.`echo $TYPE`.$PUNCHCARD.img
 
 CPU_JOB_NUM=8
 
@@ -86,39 +87,25 @@ if [ -e arch/arm/boot/zImage ]; then
     ./img.sh `echo $TYPE`
 
     echo "building boot package"
-    cp -R boot.img ../output
+    cp -r boot.img $KERNELREPO/trltesku/$CARRIERIM
     cd ../
 
-    if [ -e output/boot.tar ]; then
-        rm -R output/boot.tar
-    fi
-    if [ -e output/boot.tar ]; then
-        rm -R output/boot.tar.md5
-    fi
-    if [ -e output/boot.tar ]; then
-        rm -R output/boot.tar.md5.gz
-    fi
-
-    if [ `echo $TYPE` == "sku" ]; then
-        cp -r  output/boot.img $KERNELREPO/trltesku/boot.img
-        if [ $publish == "y" ]; then
-            starkissed Uploading
-            if [ -e $KERNELREPO/gooserver/ ]; then
-                rm -R $KERNELREPO/gooserver/*.img
-            fi
-            cp -r  $KERNELREPO/trltesku/boot.img $KERNELREPO/gooserver/$IMAGEFILE
-
-            megacmd move mega:/trltesku/*.img mega:/trltesku/archive
-            megacmd put $KERNELREPO/gooserver/*.img mega:/trltesku/
-
-#            existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
-#            scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
-#            ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
+    if [ $publish == "y" ]; then
+        starkissed Uploading
+        if [ -e $KERNELREPO/gooserver/ ]; then
+            rm -R $KERNELREPO/gooserver/*.img
         fi
-    else
-        cp -r output/boot.img starkissed/kernel/`echo $TYPE`/boot.img
-        cp -r output/boot.img skrecovery/kernel/`echo $TYPE`/boot.img
+        cp -r  $KERNELREPO/trltesku/$CARRIERIM $KERNELREPO/gooserver/$IMAGEFILE
+
+        megacmd move mega:/trltesku/*.img mega:/trltesku/archive
+        megacmd put $KERNELREPO/gooserver/*.img mega:/trltesku/
+
+        existing=`ssh upload.goo.im ls $KERNELHOST/*.img`
+        scp -r $KERNELREPO/gooserver/*.img $GOOSERVER
+        ssh upload.goo.im mv -t $KERNELHOST/archive/ $existing
     fi
+    cp -r $KERNELREPO/trltesku/$CARRIERIM starkissed/kernel/`echo $TYPE`/boot.img
+    cp -r $KERNELREPO/trltesku/$CARRIERIM skrecovery/kernel/`echo $TYPE`/boot.img
     starkissed Inactive
 
 fi
@@ -127,11 +114,7 @@ fi
 
 buildAroma () {
 
-    if [ $publish == "y" ]; then
-        starkissed Compiling
-    else
-        starkissed Verifying
-    fi
+    starkissed Packaging
     cd skrecovery
     rm *.zip
     zip -r $LOCALZIP *
@@ -163,22 +146,14 @@ buildAroma () {
 
 }
 
-echo "1. Deported"
-echo "2. StarKissed"
-echo "3. Package"
-echo "4. Carrier"
+echo "1. StarKissed"
+echo "2. Deported"
+echo "3. Carrier"
 echo "Please Choose: "
 read profile
 
 case $profile in
 1)
-    echo "Publish Image?"
-    read publish
-    TYPE=sku
-    buildKernel
-    exit
-;;
-2)
     echo "Publish Package?"
     read publish
     TYPE=tmo
@@ -199,16 +174,15 @@ case $profile in
     TYPE=usc
     BUILD=NA
     buildKernel
-    buildAroma
     exit
 ;;
-3)
+2)
     echo "Publish Package?"
     read publish
     buildAroma
     exit
 ;;
-4)
+3)
     echo "Which Carrier?"
     read carrier
     TYPE=$carrier
