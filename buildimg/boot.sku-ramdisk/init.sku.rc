@@ -12,10 +12,21 @@ on init
     setprop ro.boot.selinux 0
 
 on post-fs-data
+    # Reload SE Android Policy
+    setprop selinux.reload_policy 0
 
 on boot
     # Run sysinit
     start sysinit
+
+# Reload SE Android Policy for MDM
+on property:persist.security.mdm.policy=1
+    setprop selinux.reload_policy 1
+
+on property:selinux.reload_policy=1
+    chown system system /sys/fs/selinux/enforce
+    chown -R system system /sys/fs/selinux/booleans
+    chown system system /sys/fs/selinux/commit_pending_bools
 
 # adb over network
 on property:service.adb.tcp.port=5555
