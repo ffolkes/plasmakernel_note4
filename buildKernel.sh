@@ -58,7 +58,7 @@ else
     cat config/trlte_`echo $TYPE`_defconfig config/trlte_sku_defconfig > arch/arm/configs/apq8084_sec_trlte_`echo $TYPE`_defconfig
 fi
 cp -R config/trlte_sec_defconfig  arch/arm/configs/apq8084_sec_defconfig
-if [ `echo $TYPE` == "plz" ]; then
+if [ `echo $TYPE` != "plz" ]; then
     cp -R buildimg/boot.sku-ramdisk/* $MODULEOUT/
 fi
 
@@ -205,15 +205,17 @@ case $profile in
     TYPE=can
     BUILD=NJ3
     buildKernel
+    TYPE=usc
+    BUILD=NA
+    buildKernel
+if [ 0 = 1 ]; then
     TYPE=vzw
     BUILD=NI1
     buildKernel
     TYPE=att
     BUILD=NIE
     buildKernel
-    TYPE=usc
-    BUILD=NA
-    buildKernel
+fi
     exit
 ;;
 2)

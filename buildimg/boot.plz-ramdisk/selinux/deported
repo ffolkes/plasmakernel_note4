@@ -10,3 +10,4 @@ if [ -e /sepolicy_version ] && [ -n "$carrier"]; then
     /sbin/selinux/busybox rm -rf /sepolicy_version
     ln -s /selinux/sepolicy_version-$carrier /sepolicy_version
 fi
+/sbin/selinux/busybox mount -o ro,remount /
