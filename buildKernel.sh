@@ -155,33 +155,37 @@ fi
 
 buildAroma () {
 
-    starkissed Packaging
-    cd skrecovery
-    rm *.zip
-    zip -r $LOCALZIP *
-    cd ../
-    cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
+MEGASERVER=mega:/trltesku/
+KERNELHOST=public_html/trltesku
+GOOSERVER=upload.goo.im:$KERNELHOST
 
-    if [ $publish == "y" ]; then
-        starkissed Uploading
-        if [ -e $KERNELREPO/gooserver/ ]; then
-            rm -R $KERNELREPO/gooserver/*.zip
-        fi
-        cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
+starkissed Packaging
+cd skrecovery
+rm *.zip
+zip -r $LOCALZIP *
+cd ../
+cp -R $KERNELSPEC/skrecovery/$LOCALZIP $KERNELREPO/$LOCALZIP
 
-        for i in $(megacmd list $MEGASERVER 2>&1 | awk '{print $1}' | grep -i .zip); do
-            megacmd move $i $MEGASERVER/archive/$(basename $i)
-        done
-        megacmd put $KERNELREPO/gooserver/*.zip $MEGASERVER
+if [ $publish == "y" ]; then
+    starkissed Uploading
+    if [ -e $KERNELREPO/gooserver/ ]; then
+        rm -R $KERNELREPO/gooserver/*.zip
     fi
-    if [ -e starkissed/$AROMAZIP ];then
-        rm -R starkissed/$AROMAZIP
-    fi
-    cd starkissed
-    zip -r $AROMAZIP *
-    cd ../
-    cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
-    starkissed Inactive
+    cp -r $KERNELREPO/$LOCALZIP $KERNELREPO/gooserver/$KERNELZIP
+
+    for i in $(megacmd list $MEGASERVER 2>&1 | awk '{print $1}' | grep -i .zip); do
+        megacmd move $i $MEGASERVER/archive/$(basename $i)
+    done
+    megacmd put $KERNELREPO/gooserver/*.zip $MEGASERVER
+fi
+if [ -e starkissed/$AROMAZIP ];then
+    rm -R starkissed/$AROMAZIP
+fi
+cd starkissed
+zip -r $AROMAZIP *
+cd ../
+cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
+starkissed Inactive
 
 }
 
