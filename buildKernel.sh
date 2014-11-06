@@ -178,13 +178,15 @@ if [ $publish == "y" ]; then
     done
     megacmd put $KERNELREPO/gooserver/*.zip $MEGASERVER
 fi
-if [ -e starkissed/$AROMAZIP ];then
-    rm -R starkissed/$AROMAZIP
+if [ 0 = 1 ]; then
+    if [ -e starkissed/$AROMAZIP ];then
+        rm -R starkissed/$AROMAZIP
+    fi
+    cd starkissed
+    zip -r $AROMAZIP *
+    cd ../
+    cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
 fi
-cd starkissed
-zip -r $AROMAZIP *
-cd ../
-cp -R $KERNELSPEC/starkissed/$AROMAZIP $KERNELREPO/$AROMAZIP
 starkissed Inactive
 
 }
@@ -200,6 +202,8 @@ case $profile in
 1)
     echo "Publish Image?"
     read publish
+    echo "Publish Package?"
+    read package
     TYPE=tmo
     BUILD=NJ7
     buildKernel
@@ -212,14 +216,17 @@ case $profile in
     TYPE=usc
     BUILD=NA
     buildKernel
-if [ 0 = 1 ]; then
-    TYPE=vzw
-    BUILD=NI1
-    buildKernel
-    TYPE=att
-    BUILD=NIE
-    buildKernel
-fi
+    if [ 0 = 1 ]; then
+        TYPE=vzw
+        BUILD=NI1
+        buildKernel
+        TYPE=att
+        BUILD=NIE
+        buildKernel
+    fi
+    if [ $package == "y" ]; then
+        buildAroma
+    fi
     exit
 ;;
 2)
