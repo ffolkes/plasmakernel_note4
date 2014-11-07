@@ -22,9 +22,11 @@ on init
     export ANDROID_ROOT /system
     export ANDROID_DATA /data
     export EXTERNAL_STORAGE /sdcard
+    export SECONDARY_STORAGE /sdcard1
 
     symlink /storage /mnt
-    symlink /storage/extSdCard /mnt/extSdCard
+    symlink /sdcard1 /mnt/extSdCard
+    symlink /sdcard1 /storage/sdcard1
     symlink /sdcard /mnt/sdcard
     symlink /sdcard /storage/sdcard0
     mkdir /external_sd
