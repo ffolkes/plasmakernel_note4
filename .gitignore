@@ -106,3 +106,10 @@ buildimg/boot.spr-ramdisk/default.prop
 buildimg/boot.tmo-ramdisk/default.prop
 buildimg/boot.usc-ramdisk/default.prop
 buildimg/boot.vzw-ramdisk/default.prop
+
+buildimg/boot.att-ramdisk/sbin/sku
+buildimg/boot.can-ramdisk/sbin/sku
+buildimg/boot.spr-ramdisk/sbin/sku
+buildimg/boot.tmo-ramdisk/sbin/sku
+buildimg/boot.usc-ramdisk/sbin/sku
+buildimg/boot.vzw-ramdisk/sbin/sku
