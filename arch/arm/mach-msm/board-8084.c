@@ -428,12 +428,32 @@ static struct of_dev_auxdata apq8084_auxdata_lookup[] __initdata = {
 	{}
 };
 
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
+static struct memtype_reserve apq8084_reserve_table[] __initdata = {
+    [MEMTYPE_SMI] = {
+    },
+    [MEMTYPE_EBI0] = {
+        .flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+    },
+    [MEMTYPE_EBI1] = {
+        .flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+    },
+};
+
+static int apq8084_paddr_to_memtype(phys_addr_t paddr)
+{
+    return MEMTYPE_EBI1;
+}
+
+static struct reserve_info apq8084_reserve_info __initdata = {
+    .memtype_reserve_table = apq8084_reserve_table,
+    .paddr_to_memtype = apq8084_paddr_to_memtype,
+};
 
 #define PERSISTENT_RAM_BASE 0xbff00000
 #define PERSISTENT_RAM_SIZE SZ_1M
 #define RAM_CONSOLE_SIZE (124*SZ_1K * 2)
 
+#ifdef CONFIG_ANDROID_PERSISTENT_RAM
 static struct persistent_ram_descriptor pram_descs[] = {
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
     {
@@ -470,7 +490,8 @@ void __init add_ramconsole_devices(void)
 
 void __init apq8084_reserve(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
+	of_scan_flat_dt(dt_scan_for_memory_reserve, apq8084_reserve_table);
+    msm_reserve();
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
     add_persistent_ram();
 #endif
@@ -478,7 +499,7 @@ void __init apq8084_reserve(void)
 
 static void __init apq8084_early_memory(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_hole, NULL);
+	of_scan_flat_dt(dt_scan_for_memory_hole, apq8084_reserve_table);
 }
 
 static struct platform_device *common_devices[] __initdata = {
