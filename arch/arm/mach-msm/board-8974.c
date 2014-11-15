@@ -19,7 +19,9 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
+#ifdef CONFIG_ANDROID_PERSISTENT_RAM
 #include <linux/persistent_ram.h>
+#endif
 #include <linux/memory.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/krait-regulator.h>
@@ -44,11 +46,12 @@
 #include "clock.h"
 #include "platsmp.h"
 
+#ifdef CONFIG_ANDROID_PERSISTENT_RAM
+
 #define PERSISTENT_RAM_BASE 0xbff00000
 #define PERSISTENT_RAM_SIZE SZ_1M
 #define RAM_CONSOLE_SIZE (124*SZ_1K * 2)
 
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
 static struct persistent_ram_descriptor pram_descs[] = {
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
         {
