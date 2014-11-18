@@ -428,12 +428,11 @@ static struct of_dev_auxdata apq8084_auxdata_lookup[] __initdata = {
 	{}
 };
 
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
-
 #define PERSISTENT_RAM_BASE 0xbff00000
 #define PERSISTENT_RAM_SIZE SZ_1M
 #define RAM_CONSOLE_SIZE (124*SZ_1K * 2)
 
+#ifdef CONFIG_ANDROID_PERSISTENT_RAM
 static struct persistent_ram_descriptor pram_descs[] = {
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
     {
@@ -443,7 +442,7 @@ static struct persistent_ram_descriptor pram_descs[] = {
 #endif
 };
 
-static struct persistent_ram apq8084_persistent_ram = {
+static struct persistent_ram msm8974_persistent_ram = {
     .start = PERSISTENT_RAM_BASE,
     .size = PERSISTENT_RAM_SIZE,
     .num_descs = ARRAY_SIZE(pram_descs),
@@ -452,7 +451,7 @@ static struct persistent_ram apq8084_persistent_ram = {
 
 void __init add_persistent_ram(void)
 {
-    persistent_ram_early_init(&apq8084_persistent_ram);
+    persistent_ram_early_init(&msm8974_persistent_ram);
 }
 #endif
 
