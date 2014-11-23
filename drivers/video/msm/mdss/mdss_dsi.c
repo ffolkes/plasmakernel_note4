@@ -581,8 +581,8 @@ void mdss_dsi_ctrl_setup(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_err("%s+: ctrl=%p ndx=%d\n",
-				__func__, ctrl_pdata, ctrl_pdata->ndx);
+	//pr_err("%s+: ctrl=%p ndx=%d\n",
+	//			__func__, ctrl_pdata, ctrl_pdata->ndx);
 
 	pinfo = &pdata->panel_info;
 
@@ -659,7 +659,7 @@ void mdss_dsi_reset(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	struct mdss_panel_data *pdata = &ctrl->panel_data;
 
-	pr_debug("%s: called for ctrl%d\n", __func__, ctrl->ndx);
+	//pr_debug("%s: called for ctrl%d\n", __func__, ctrl->ndx);
 
 	/* DSI controller reset and init */
 	mdss_dsi_sw_reset(pdata);
@@ -676,7 +676,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	int cur_power_state;
 
 	if (pdata == NULL) {
-		pr_err("%s: Invalid input data\n", __func__);
+		//pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
 
@@ -684,8 +684,8 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 				panel_data);
 
 	cur_power_state = pdata->panel_info.panel_power_state;
-	pr_debug("%s+: ctrl=%p ndx=%d cur_power_state=%d\n", __func__,
-		ctrl_pdata, ctrl_pdata->ndx, cur_power_state);
+	//pr_debug("%s+: ctrl=%p ndx=%d cur_power_state=%d\n", __func__,
+	//	ctrl_pdata, ctrl_pdata->ndx, cur_power_state);
 
 	pinfo = &pdata->panel_info;
 	mipi = &pdata->panel_info.mipi;
