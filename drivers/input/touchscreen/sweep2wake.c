@@ -38,6 +38,8 @@
 #include <linux/earlysuspend.h>
 #endif
 
+extern void zzmoove_boost(unsigned int screen_state, unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+
 /* Version, author, desc, etc */
 #define DRIVER_AUTHOR "Dennis Rassmann <showp1984@gmail.com>"
 #define DRIVER_DESCRIPTION "Sweep2wake for almost any device"
@@ -129,10 +131,11 @@ static void sweep2wake_presspwr(struct work_struct *sweep2wake_presspwr_work) {
 static DECLARE_WORK(sweep2wake_presspwr_work, sweep2wake_presspwr);
 
 /* PowerKey trigger */
-static void sweep2wake_pwrswitch(void) {
+void sweep2wake_pwrswitch(void) {
 	schedule_work(&sweep2wake_presspwr_work);
         return;
 }
+EXPORT_SYMBOL(sweep2wake_pwrswitch);
 
 /* reset on finger release */
 static void sweep2wake_reset(void) {
@@ -156,8 +159,8 @@ static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
 			(single_touch) ? "true" : "false");
 #endif
 	if (single_touch && s2w_switch > 0) {
-        if (scr_suspended == false) {
-            /* s2s: right->left */
+        /*if (scr_suspended == false) {
+            // s2s: right->left
             scr_on_touch = true;
             prev_coord = DEFAULT_S2W_X_B5;
             next_coord = DEFAULT_S2W_X_B2;
@@ -189,7 +192,7 @@ static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
                     }
                 }
             }
-        }
+        }*/
         if (scr_suspended == true) {
             /* s2s: left->right */
             scr_on_touch = false;
@@ -214,6 +217,7 @@ static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
                             DEFAULT_S2W_Y_LIMIT)) {
                         if (sweep_coord > DEFAULT_S2W_X_B5) {
                             if (exec_count) {
+								zzmoove_boost(0, 20, 40, 20, 40);
                                 pr_info(LOGTAG"ON\n");
                                 sweep2wake_pwrswitch();
                                 exec_count = false;
@@ -242,23 +246,28 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 		(code==ABS_MT_TRACKING_ID) ? "ID" :
 		"undef"), code, value);
 #endif
+	//pr_info("[s2w] dev: %s, type: %d, code: %d, value: %d\n", handle->dev->name, type, code, value);
 	if (code == ABS_MT_SLOT) {
+		pr_info("[s2w] reset (slot)\n");
 		sweep2wake_reset();
 		return;
 	}
 
 	if (code == ABS_MT_TRACKING_ID && value == -1) {
+		pr_info("[s2w] reset\n");
 		sweep2wake_reset();
 		return;
 	}
 
 	if (code == ABS_MT_POSITION_X) {
 		touch_x = value;
+		//pr_info("[s2w] X: %d\n", value);
 		touch_x_called = true;
 	}
 
 	if (code == ABS_MT_POSITION_Y) {
 		touch_y = value;
+		//pr_info("[s2w] Y: %d\n", value);
 		touch_y_called = true;
 	}
 
@@ -272,8 +281,10 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 static int input_dev_filter(struct input_dev *dev) {
 	if (strstr(dev->name, "touch") ||
 	    strstr(dev->name, "lge_touch_core")) {
+		pr_info("[s2w] registered: %s\n", dev->name);
 		return 0;
 	} else {
+		pr_info("[s2w] skipped: %s\n", dev->name);
 		return 1;
 	}
 }
