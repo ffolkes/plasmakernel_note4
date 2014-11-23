@@ -36,6 +36,10 @@
 #endif
 #include <linux/sec_class.h>
 
+extern bool suspend_flag;
+extern void zzmoove_boost(unsigned int screen_state,
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+
 #if defined(CONFIG_SENSORS_HALL)
 static bool flip_cover;
 #endif
@@ -352,7 +356,20 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	 * without a press event
 	 */
 	static int home_old_state;
-
+	
+	if (state && button->code == 172) {
+		
+		if (suspend_flag) {
+			zzmoove_boost(0, 5, 10, 10, 10);
+		} else {
+			zzmoove_boost(0, 25, 50, 30, 50);
+		}
+		
+		pr_info("[KEY] boosted home press\n");
+		
+	} else {
+		pr_info("[KEY] not boosting power press (key: %d, state: %d)\n", button->code, state);
+	}
 
 	if (button->code == KEY_HOMEPAGE) {
 		if (!home_old_state && !state && key_irq_state ) {

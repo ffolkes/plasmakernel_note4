@@ -88,6 +88,9 @@
  */
 #define MSM_HSIC_INT_MODERATION 12000
 
+struct timeval time_lasthsicirq;
+struct timeval time_lastsuspended;
+
 static u64 dma_mask = DMA_BIT_MASK(64);
 
 struct mxhci_hsic_hcd {
@@ -645,6 +648,8 @@ static irqreturn_t mxhci_hsic_wakeup_irq(int irq, void *data)
 {
 	struct mxhci_hsic_hcd *mxhci = data;
 	int ret;
+	
+	do_gettimeofday(&time_lasthsicirq);
 
 	mxhci->wakeup_int_cnt++;
 	dev_err(mxhci->dev, "%s: remote wakeup interrupt cnt: %u\n",
@@ -741,7 +746,7 @@ static int mxhci_hsic_bus_suspend(struct usb_hcd *hcd)
 	if (!(readl_relaxed(MSM_HSIC_PORTSC) & PORT_PE)) {
 		xhci_dbg_log_event(&dbg_hsic, NULL,
 				"port is not enabled; skip suspend", 0);
-		dev_dbg(mxhci->dev, "%s: port is not enabled; skip suspend\n",
+		dev_err(mxhci->dev, "%s: port is not enabled; skip suspend\n",
 				__func__);
 		return -EAGAIN;
 	}
@@ -763,7 +768,7 @@ static int mxhci_hsic_bus_suspend(struct usb_hcd *hcd)
 
 	if (!ret) {
 		stat = readl_relaxed(MSM_HSIC_PWR_EVENT_IRQ_STAT);
-		dev_dbg(mxhci->dev, "IN_L2_IRQ timeout\n");
+		dev_err(mxhci->dev, "IN_L2_IRQ timeout\n");
 		xhci_dbg_log_event(&dbg_hsic, NULL, "IN_L2_IRQ timeout",
 			stat);
 		xhci_dbg_log_event(&dbg_hsic, NULL, "PORTSC",
@@ -833,7 +838,7 @@ static int mxhci_hsic_suspend(struct mxhci_hsic_hcd *mxhci)
 	int ret;
 
 	if (mxhci->in_lpm) {
-		dev_dbg(mxhci->dev, "%s called in lpm\n", __func__);
+		dev_err(mxhci->dev, "%s called in lpm\n", __func__);
 		return 0;
 	}
 
@@ -851,7 +856,7 @@ static int mxhci_hsic_suspend(struct mxhci_hsic_hcd *mxhci)
 	/* make sure we don't race against a remote wakeup */
 	if (test_bit(HCD_FLAG_WAKEUP_PENDING, &hcd->flags) ||
 	    (readl_relaxed(MSM_HSIC_PORTSC) & PORT_PLS_MASK) == XDEV_RESUME) {
-		dev_dbg(mxhci->dev, "wakeup pending, aborting suspend\n");
+		dev_err(mxhci->dev, "wakeup pending, aborting suspend\n");
 		enable_irq(mxhci->pwr_event_irq);
 		enable_irq(hcd->irq);
 		return -EBUSY;
@@ -909,7 +914,7 @@ static int mxhci_hsic_resume(struct mxhci_hsic_hcd *mxhci)
 	unsigned long flags;
 
 	if (!mxhci->in_lpm) {
-		dev_dbg(mxhci->dev, "%s called in !in_lpm\n", __func__);
+		dev_err(mxhci->dev, "%s called in !in_lpm\n", __func__);
 		return 0;
 	}
 
@@ -1315,7 +1320,7 @@ static ssize_t host_ready_store(struct device *pdev,
 		return -ENODEV;
 	}
 
-	dev_dbg(pdev, "assert: %d\n", assert);
+	dev_err(pdev, "assert: %d\n", assert);
 
 	mxhci = hcd_to_hsic(hcd);
 	if (mxhci->host_ready)
@@ -1582,7 +1587,7 @@ static int mxhci_hsic_probe(struct platform_device *pdev)
 
 	mxhci->bus_scale_table = msm_bus_cl_get_pdata(pdev);
 	if (!mxhci->bus_scale_table) {
-		dev_dbg(&pdev->dev, "bus scaling is disabled\n");
+		dev_err(&pdev->dev, "bus scaling is disabled\n");
 	} else {
 		mxhci->bus_perf_client =
 			msm_bus_scale_register_client(mxhci->bus_scale_table);
@@ -1605,7 +1610,7 @@ static int mxhci_hsic_probe(struct platform_device *pdev)
 
 	ret = device_create_file(&pdev->dev, &dev_attr_config_imod);
 	if (ret)
-		dev_dbg(&pdev->dev, "%s: unable to create imod sysfs entry\n",
+		dev_err(&pdev->dev, "%s: unable to create imod sysfs entry\n",
 					__func__);
 
 	enable_irq(irq);
@@ -1624,11 +1629,11 @@ static int mxhci_hsic_probe(struct platform_device *pdev)
 	if (ret)
 		pr_err("err creating sysfs node\n");
 
-	dev_dbg(&pdev->dev, "%s: Probe complete\n", __func__);
+	dev_err(&pdev->dev, "%s: Probe complete\n", __func__);
 
 	ret = mxhci_hsic_debugfs_init();
 	if (ret)
-		dev_dbg(&pdev->dev, "debugfs is not availabile\n");
+		dev_err(&pdev->dev, "debugfs is not availabile\n");
 
 	__mxhci = mxhci;
 	return 0;
@@ -1716,7 +1721,8 @@ static int mxhci_hsic_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM_RUNTIME
 static int mxhci_hsic_runtime_idle(struct device *dev)
 {
-	dev_dbg(dev, "xhci msm runtime idle\n");
+	dev_err(dev, "xhci msm runtime idle\n");
+	pr_info("[xhci-msm] runtime idle\n");
 	return 0;
 }
 
@@ -1724,8 +1730,10 @@ static int mxhci_hsic_runtime_suspend(struct device *dev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 	struct mxhci_hsic_hcd *mxhci = hcd_to_hsic(hcd);
+	
+	pr_info("[xhci-msm] runtime suspend\n");
 
-	dev_dbg(dev, "xhci msm runtime suspend\n");
+	dev_err(dev, "xhci msm runtime suspend\n");
 	xhci_dbg_log_event(&dbg_hsic, NULL,  "Run Time PM Suspend", 0);
 
 	return mxhci_hsic_suspend(mxhci);
@@ -1735,8 +1743,10 @@ static int mxhci_hsic_runtime_resume(struct device *dev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 	struct mxhci_hsic_hcd *mxhci = hcd_to_hsic(hcd);
+	
+	pr_info("[xhci-msm] runtime resume\n");
 
-	dev_dbg(dev, "xhci msm runtime resume\n");
+	dev_err(dev, "xhci msm runtime resume\n");
 	xhci_dbg_log_event(&dbg_hsic, NULL, "Run Time PM Resume", 0);
 
 	return mxhci_hsic_resume(mxhci);
@@ -1748,12 +1758,16 @@ static int mxhci_hsic_pm_suspend(struct device *dev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 	struct mxhci_hsic_hcd *mxhci = hcd_to_hsic(hcd);
+	
+	pr_info("[xhci-msm] PM suspend\n");
+	
+	do_gettimeofday(&time_lastsuspended);
 
-	dev_dbg(dev, "xhci-msm PM suspend\n");
+	dev_err(dev, "xhci-msm PM suspend\n");
 	xhci_dbg_log_event(&dbg_hsic, NULL, "PM Suspend", 0);
 
 	if (!mxhci->in_lpm) {
-		dev_dbg(dev, "abort suspend\n");
+		dev_err(dev, "abort suspend\n");
 		return -EBUSY;
 	}
 
@@ -1769,8 +1783,10 @@ static int mxhci_hsic_pm_resume(struct device *dev)
 	struct mxhci_hsic_hcd *mxhci = hcd_to_hsic(hcd);
 	unsigned long flags;
 	int ret;
+	
+	pr_info("[xhci-msm] PM resume\n");
 
-	dev_dbg(dev, "xhci-msm PM resume\n");
+	dev_err(dev, "xhci-msm PM resume\n");
 	xhci_dbg_log_event(&dbg_hsic, NULL, "PM Resume", 0);
 
 	if (device_may_wakeup(dev))

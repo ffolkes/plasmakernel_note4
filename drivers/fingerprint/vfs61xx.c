@@ -26,6 +26,8 @@
 #include <mach/gpio.h>
 #endif
 
+extern void zzmoove_boost(unsigned int screen_state,
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
 
 /* Pass to VFSSPI_IOCTL_GET_FREQ_TABLE command */
 /**
@@ -1035,6 +1037,8 @@ long vfsspi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			pr_info("%s ocp flag high\n", __func__);
 		break;
 	case VFSSPI_IOCTL_POWER_OFF:
+		pr_info("[fingerprint/vfsspi_ioctl] boosting for unlock!\n");
+		zzmoove_boost(1, 10, 50, 30, 100);
 		pr_info("%s VFSSPI_IOCTL_POWER_OFF\n", __func__);
 		if (vfsSpiDev->ldocontrol && vfsSpiDev->ldo_onoff) {
 			vfsspi_regulator_onoff(vfsSpiDev, false);

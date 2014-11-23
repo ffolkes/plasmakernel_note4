@@ -15,6 +15,12 @@
 #include <linux/msm-sps.h>
 #include "slim-msm.h"
 
+extern struct timeval time_lasthsicirq;
+extern struct timeval time_lastsuspended;
+extern bool suspend_flag;
+extern void zzmoove_boost(unsigned int screen_state,
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len)
 {
 	spin_lock(&dev->rx_lock);
@@ -1264,6 +1270,24 @@ void msm_slim_qmi_exit(struct msm_slim_ctrl *dev)
 int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 {
 	struct slimbus_power_req_msg_v01 req;
+	struct timeval time_now;
+	int time_since_lasthsicirq = 0;
+	int time_since_lastsuspended = 0;
+	
+	if (suspend_flag && active) {
+		do_gettimeofday(&time_now);
+		
+		time_since_lasthsicirq = (time_now.tv_sec - time_lasthsicirq.tv_sec) * MSEC_PER_SEC +
+								(time_now.tv_usec - time_lasthsicirq.tv_usec) / USEC_PER_MSEC;
+		
+		time_since_lastsuspended = (time_now.tv_sec - time_lastsuspended.tv_sec) * MSEC_PER_SEC +
+								(time_now.tv_usec - time_lastsuspended.tv_usec) / USEC_PER_MSEC;
+		
+		if (time_since_lastsuspended > 4000 && time_since_lasthsicirq < 4000) {
+			zzmoove_boost(2, 20, 30, 20, 0);
+			pr_info("msm_slim_qmi_power_request: boosting! (time since hsic irq: %d, active: %d)\n", time_since_lasthsicirq, active);
+		}
+	}
 
 	dev_err(dev->dev, "%s: active %d\n", __func__, active);
 

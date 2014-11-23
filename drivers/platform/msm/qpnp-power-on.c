@@ -27,6 +27,8 @@
 #include <mach/sec_debug.h>
 #endif
 
+extern void zzmoove_boost(unsigned int screen_state,
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
 
 /* Common PNP defines */
 #define QPNP_PON_REVISION2(base)		(base + 0x01)
@@ -502,6 +504,15 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		input_report_key(pon->pon_input, cfg->key_code, 1);
 		input_sync(pon->pon_input);
 	}
+	
+	pr_info("[qpnp-power-on] qpnp_pon_input_dispatch. code: %d status: %d\n", cfg->key_code, key_status);
+	
+	// boost as fast as possible for power key, but let voldown be handled by inputbooster.
+	// also boost if release event occurred without a press.
+	if (cfg->key_code == 116 && (key_status || (!cfg->old_state && !key_status))) {
+		pr_info("[qpnp-power-on/qpnp_pon_input_dispatch] boosting for powerkey!\n");
+		zzmoove_boost(2, 25, 50, 30, 100);
+	}
 
 	input_report_key(pon->pon_input, cfg->key_code, key_status);
 	input_sync(pon->pon_input);
@@ -554,6 +565,8 @@ static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
 	rc = qpnp_pon_input_dispatch(pon, PON_KPDPWR);
 	if (rc)
 		dev_err(&pon->spmi->dev, "Unable to send input event\n");
+	
+	pr_info("[qpnp-power-on] qpnp_kpdpwr_irq\n");
 
 	return IRQ_HANDLED;
 }
@@ -567,6 +580,8 @@ static irqreturn_t qpnp_resin_irq(int irq, void *_pon)
 {
 	int rc;
 	struct qpnp_pon *pon = _pon;
+	
+	pr_info("[qpnp-power-on] qpnp_resin_irq\n");
 
 	rc = qpnp_pon_input_dispatch(pon, PON_RESIN);
 	if (rc)
@@ -583,6 +598,8 @@ static irqreturn_t qpnp_cblpwr_irq(int irq, void *_pon)
 {
 	int rc;
 	struct qpnp_pon *pon = _pon;
+	
+	pr_info("[qpnp-power-on] qpnp_cblpwr_irq\n");
 
 	rc = qpnp_pon_input_dispatch(pon, PON_CBLPWR);
 	if (rc)
@@ -714,6 +731,8 @@ static irqreturn_t qpnp_resin_bark_irq(int irq, void *_pon)
 		dev_err(&pon->spmi->dev, "Unable to configure S2 enable\n");
 		goto err_exit;
 	}
+	
+	pr_info("[qpnp-power-on] qpnp_resin_bark_irq. code: %d\n", cfg->key_code);
 
 	/* report the key event */
 	input_report_key(pon->pon_input, cfg->key_code, 1);

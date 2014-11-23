@@ -115,6 +115,8 @@ struct es705_api_access {
 static int network_type = NARROW_BAND;
 static int extra_volume = 0;
 
+extern void zzmoove_boost(unsigned int screen_state, unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+
 /* Route state for Internal state management */
 enum es705_power_state {
 ES705_POWER_FW_LOAD,
@@ -5367,6 +5369,10 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 {
 	struct es705_priv *es705 = (struct es705_priv *)irq_data;
 	u32 cmd_stop[] = {0x9017e000, 0x90180000, 0xffffffff};
+	
+	// TODO: add compiler tags
+	zzmoove_boost(0, 30, 60, 30, 50);
+	pr_info("[es705/es705_irq_event] boosting wakeup\n");
 
 	mutex_lock(&es705->cvq_mutex);
 	dev_info(es705->dev, "%s(): %s mode, Interrupt event",
