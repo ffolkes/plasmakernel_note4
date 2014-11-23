@@ -115,7 +115,7 @@ static void max77843_test_read(struct max77843_charger_data *charger)
 	u32 addr = 0;
 	for (addr = 0xB0; addr <= 0xC3; addr++) {
 		max77843_read_reg(charger->i2c, addr, &data);
-		pr_debug("MAX77843 addr : 0x%02x data : 0x%02x\n", addr, data);
+		//pr_debug("MAX77843 addr : 0x%02x data : 0x%02x\n", addr, data);
 	}
 }
 
