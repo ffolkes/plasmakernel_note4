@@ -20,7 +20,6 @@ on post-fs-data
 on boot
     # Customization
     start sysinit
-    start deported
 
 # Reload SE Android Policy for MDM
 on property:persist.security.mdm.policy=1
