@@ -91,7 +91,7 @@ extern int s2w_switch;
 extern int get_lcd_attached(void);
 extern int boot_mode_recovery;
 
-static bool flg_enable_hover = true;
+static bool flg_enable_hover = false;
 bool flg_tsp_always_on = false;
 
 #ifdef USE_OPEN_CLOSE
