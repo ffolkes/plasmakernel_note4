@@ -150,7 +150,7 @@ static void sweep2wake_reset(void) {
 /* Sweep2wake main function */
 static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
 {
-	int prev_coord = 0, next_coord = 0;
+	//int prev_coord = 0, next_coord = 0;
 	int reverse_prev_coord = 0, reverse_next_coord = 0;
 	bool single_touch = st;
 #if S2W_DEBUG
