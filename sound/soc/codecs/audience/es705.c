@@ -117,6 +117,12 @@ static int extra_volume = 0;
 
 extern void zzmoove_boost(unsigned int screen_state, unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
 
+struct timeval time_voice_lastheard;
+struct timeval time_voice_lastirq;
+bool flg_voice_allowturnoff = false;
+extern void press_power(void);
+extern bool flg_power_suspended;
+
 /* Route state for Internal state management */
 enum es705_power_state {
 ES705_POWER_FW_LOAD,
@@ -2887,10 +2893,31 @@ static int es705_put_voice_wakeup_enable_value(struct snd_kcontrol *kcontrol,
 			0x9017e000, 0x90180002,
 			0xffffffff};
 	int match = 1;
+	struct timeval time_now;
+	int timesince_voice_lastirq = 0;
+	//int timesince_voice_lastheard = 0;
 #ifdef SEAMLESS_VOICE_WAKEUP
 	u32 vs_keyword_length_cmd = 0x902C0000 | (es705_priv.vs_keyword_length & 0xFFFF);
 #endif
 	unsigned int value = 0;
+	
+	if (ucontrol->value.integer.value[0] == 0) {
+		// check to see if it was recently off.
+		
+		do_gettimeofday(&time_now);
+		
+		timesince_voice_lastirq = (time_now.tv_sec - time_voice_lastirq.tv_sec) * MSEC_PER_SEC +
+								(time_now.tv_usec - time_voice_lastirq.tv_usec) / USEC_PER_MSEC;
+		
+		if (timesince_voice_lastirq > 2000 && timesince_voice_lastirq < 45000 && flg_voice_allowturnoff) {
+			pr_info("[es705/es705_put_voice_wakeup_enable_value] pressing power key (timesince: %d)\n", timesince_voice_lastirq);
+			press_power();
+		} else {
+			pr_info("[es705/es705_put_voice_wakeup_enable_value] would be pressing power key (timesince: %d)\n", timesince_voice_lastirq);
+		}
+	}
+	
+	do_gettimeofday(&time_voice_lastheard);
 
 	if (es705_priv.voice_wakeup_enable == ucontrol->value.integer.value[0]) {
 		dev_info(es705_priv.dev, "%s(): skip to set voice_wakeup_enable[%d->%ld]\n",
@@ -5373,6 +5400,12 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 	// TODO: add compiler tags
 	zzmoove_boost(0, 30, 60, 30, 50);
 	pr_info("[es705/es705_irq_event] boosting wakeup\n");
+	
+	if (flg_power_suspended) {
+		flg_voice_allowturnoff = true;
+	}
+	
+	do_gettimeofday(&time_voice_lastirq);
 
 	mutex_lock(&es705->cvq_mutex);
 	dev_info(es705->dev, "%s(): %s mode, Interrupt event",
