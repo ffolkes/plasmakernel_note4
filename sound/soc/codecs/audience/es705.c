@@ -5398,7 +5398,7 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 	u32 cmd_stop[] = {0x9017e000, 0x90180000, 0xffffffff};
 	
 	// TODO: add compiler tags
-	zzmoove_boost(0, 30, 60, 30, 50);
+	zzmoove_boost(0, 30, 40, 10, 0);
 	pr_info("[es705/es705_irq_event] boosting wakeup\n");
 	
 	if (flg_power_suspended) {

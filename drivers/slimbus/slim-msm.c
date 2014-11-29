@@ -1284,7 +1284,7 @@ int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 								(time_now.tv_usec - time_lastsuspended.tv_usec) / USEC_PER_MSEC;
 		
 		if (time_since_lastsuspended > 4000 && time_since_lasthsicirq < 4000) {
-			zzmoove_boost(2, 20, 30, 20, 0);
+			zzmoove_boost(2, 3, 10, 5, 0);
 			pr_info("msm_slim_qmi_power_request: boosting! (time since hsic irq: %d, active: %d)\n", time_since_lasthsicirq, active);
 		}
 	}

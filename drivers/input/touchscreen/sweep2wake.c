@@ -217,7 +217,7 @@ static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
                             DEFAULT_S2W_Y_LIMIT)) {
                         if (sweep_coord > DEFAULT_S2W_X_B5) {
                             if (exec_count) {
-								zzmoove_boost(0, 20, 40, 20, 40);
+								zzmoove_boost(0, 5, 20, 5, 40);
                                 pr_info(LOGTAG"ON\n");
                                 sweep2wake_pwrswitch();
                                 exec_count = false;

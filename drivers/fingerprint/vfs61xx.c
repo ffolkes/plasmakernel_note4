@@ -1038,7 +1038,7 @@ long vfsspi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 	case VFSSPI_IOCTL_POWER_OFF:
 		pr_info("[fingerprint/vfsspi_ioctl] boosting for unlock!\n");
-		zzmoove_boost(1, 10, 50, 30, 100);
+		zzmoove_boost(1, 5, 20, 5, 100);
 		pr_info("%s VFSSPI_IOCTL_POWER_OFF\n", __func__);
 		if (vfsSpiDev->ldocontrol && vfsSpiDev->ldo_onoff) {
 			vfsspi_regulator_onoff(vfsSpiDev, false);

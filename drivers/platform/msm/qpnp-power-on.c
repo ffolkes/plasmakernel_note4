@@ -30,6 +30,8 @@
 extern void zzmoove_boost(unsigned int screen_state,
 						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
 
+struct timeval time_pressed_power;
+
 /* Common PNP defines */
 #define QPNP_PON_REVISION2(base)		(base + 0x01)
 
@@ -511,7 +513,10 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	// also boost if release event occurred without a press.
 	if (cfg->key_code == 116 && (key_status || (!cfg->old_state && !key_status))) {
 		pr_info("[qpnp-power-on/qpnp_pon_input_dispatch] boosting for powerkey!\n");
-		zzmoove_boost(2, 25, 50, 30, 100);
+		zzmoove_boost(2, 5, 20, 5, 100);
+		
+		// save when power was last pressed, for touchwake.
+		do_gettimeofday(&time_pressed_power);
 	}
 
 	input_report_key(pon->pon_input, cfg->key_code, key_status);
