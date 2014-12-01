@@ -122,6 +122,7 @@ struct timeval time_voice_lastirq;
 bool flg_voice_allowturnoff = false;
 extern void press_power(void);
 extern bool flg_power_suspended;
+extern bool sttg_voice_enableturnoff;
 
 /* Route state for Internal state management */
 enum es705_power_state {
@@ -2901,7 +2902,7 @@ static int es705_put_voice_wakeup_enable_value(struct snd_kcontrol *kcontrol,
 #endif
 	unsigned int value = 0;
 	
-	if (ucontrol->value.integer.value[0] == 0) {
+	if (sttg_voice_enableturnoff && ucontrol->value.integer.value[0] == 0) {
 		// check to see if it was recently off.
 		
 		do_gettimeofday(&time_now);
@@ -2915,9 +2916,9 @@ static int es705_put_voice_wakeup_enable_value(struct snd_kcontrol *kcontrol,
 		} else {
 			pr_info("[es705/es705_put_voice_wakeup_enable_value] would be pressing power key (timesince: %d)\n", timesince_voice_lastirq);
 		}
+		
+		do_gettimeofday(&time_voice_lastheard);
 	}
-	
-	do_gettimeofday(&time_voice_lastheard);
 
 	if (es705_priv.voice_wakeup_enable == ucontrol->value.integer.value[0]) {
 		dev_info(es705_priv.dev, "%s(): skip to set voice_wakeup_enable[%d->%ld]\n",
