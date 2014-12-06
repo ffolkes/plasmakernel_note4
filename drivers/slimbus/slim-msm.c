@@ -15,11 +15,11 @@
 #include <linux/msm-sps.h>
 #include "slim-msm.h"
 
-extern struct timeval time_lasthsicirq;
+/*extern struct timeval time_lasthsicirq;
 extern struct timeval time_lastsuspended;
 extern bool suspend_flag;
 extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);*/
 
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len)
 {
@@ -1270,7 +1270,7 @@ void msm_slim_qmi_exit(struct msm_slim_ctrl *dev)
 int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 {
 	struct slimbus_power_req_msg_v01 req;
-	struct timeval time_now;
+	/*struct timeval time_now;
 	int time_since_lasthsicirq = 0;
 	int time_since_lastsuspended = 0;
 	
@@ -1287,7 +1287,7 @@ int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 			zzmoove_boost(2, 3, 10, 5, 0);
 			pr_info("msm_slim_qmi_power_request: boosting! (time since hsic irq: %d, active: %d)\n", time_since_lasthsicirq, active);
 		}
-	}
+	}*/
 
 	dev_err(dev->dev, "%s: active %d\n", __func__, active);
 
