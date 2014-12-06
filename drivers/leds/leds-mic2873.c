@@ -40,6 +40,8 @@ static bool sysfs_flash_op;
 extern int led_torch_en;
 extern int led_flash_en;
 
+static bool flg_rearled_on = false;
+
 static int mic2873_flash_ctrl (int isOn, int cur)
 {
 	int ret = 0;
@@ -269,6 +271,47 @@ int mic2873_led_en(int onoff, int mode)
 	return ret;
 }
 EXPORT_SYMBOL(mic2873_led_en);
+
+void controlRearLED(unsigned int level)
+{
+	unsigned int cur = 0;
+	
+	if (level) {
+		// turn LED on.
+		
+		// max brightness check.
+		if (level > 10)
+			level = 10;
+		
+		cur = (unsigned int)(MIC2873_TORCH_CURRENT_TEN1_062P5 - level + 1);
+		pr_info("[REARLED] called internally ON, level: %u, cur: %d\n", level, cur);
+		mic2873_torch_ctrl(MIC2873_OP_SWITCH_ON, cur);
+		flg_rearled_on = true;
+		
+	} else {
+		// turn LED off.
+		
+		pr_info("[REARLED] called internally OFF\n");
+		mic2873_torch_ctrl(MIC2873_OP_SWITCH_OFF, 0);
+		flg_rearled_on = false;
+	}
+}
+EXPORT_SYMBOL(controlRearLED);
+
+void toggleRearLED(unsigned int level)
+{
+	if (flg_rearled_on) {
+		// if the LED is on, turn it off.
+		
+		controlRearLED(0);
+		
+	} else {
+		// if the LED is off, turn it on.
+		
+		controlRearLED(level);
+	}
+}
+EXPORT_SYMBOL(toggleRearLED);
 
 static ssize_t mic2873_flash_show(struct device *dev,
                                    struct device_attribute *attr, char *buf)
