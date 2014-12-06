@@ -27,6 +27,10 @@
 #include <linux/hrtimer.h>
 #include "governor.h"
 
+extern unsigned long sttg_devfreq_mid_freq;
+int flg_ctr_devfreq_max = 0;
+int flg_ctr_devfreq_mid = 0;
+
 static struct class *devfreq_class;
 
 /*
@@ -181,6 +185,7 @@ static struct devfreq_governor *find_devfreq_governor(const char *name)
 int update_devfreq(struct devfreq *devfreq)
 {
 	unsigned long freq;
+	unsigned long cur_freq;
 	int err = 0;
 	u32 flags = 0;
 
@@ -204,6 +209,34 @@ int update_devfreq(struct devfreq *devfreq)
 	 * max_freq (probably called by thermal when it's too hot)
 	 * min_freq
 	 */
+	
+	if (flg_ctr_devfreq_max > 0) {
+		
+		//pr_info("[devfreq] flg_ctr_devfreq_max = %d, target: %ld, name: %s\n",
+		//		flg_ctr_devfreq_max, freq, devfreq->governor->name);
+		
+		freq = devfreq->max_freq;
+		
+		//pr_info("[devfreq] newfreq: %ld, name: %s\n", freq, devfreq->governor->name);
+		
+	} else {
+		
+		// mid boost only applies to the gpu.
+		if (flg_ctr_devfreq_mid > 0
+			&& sttg_devfreq_mid_freq > 0
+			&& strstr(devfreq->governor->name, "msm-adreno-tz")) {
+			
+			devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+			
+			//pr_info("[devfreq] flg_ctr_devfreq_mid = %d, cur_freq: %ld, target: %ld, sttg: %ld, name: %s\n",
+			//		flg_ctr_devfreq_mid, cur_freq, freq, sttg_devfreq_mid_freq, devfreq->governor->name);
+			
+			if (cur_freq < sttg_devfreq_mid_freq || (freq > 0 && freq < sttg_devfreq_mid_freq)) {
+				freq = sttg_devfreq_mid_freq;
+				//pr_info("[devfreq] newfreq: %ld\n", freq);
+			}
+		}
+	}
 
 	if (devfreq->min_freq && freq < devfreq->min_freq) {
 		freq = devfreq->min_freq;

@@ -28,7 +28,8 @@
 #endif
 
 extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles,
+						  unsigned int input_cycles, unsigned int devfreq_max_cycles, unsigned int devfreq_mid_cycles);
 
 struct timeval time_pressed_power;
 
@@ -513,7 +514,7 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	// also boost if release event occurred without a press.
 	if (cfg->key_code == 116 && (key_status || (!cfg->old_state && !key_status))) {
 		pr_info("[qpnp-power-on/qpnp_pon_input_dispatch] boosting for powerkey!\n");
-		zzmoove_boost(2, 5, 20, 5, 100);
+		zzmoove_boost(12, 5, 20, 5, 100, 5, 50);
 		
 		// save when power was last pressed, for touchwake.
 		do_gettimeofday(&time_pressed_power);
@@ -571,7 +572,7 @@ static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
 	if (rc)
 		dev_err(&pon->spmi->dev, "Unable to send input event\n");
 	
-	pr_info("[qpnp-power-on] qpnp_kpdpwr_irq\n");
+	//pr_info("[qpnp-power-on] qpnp_kpdpwr_irq\n");
 
 	return IRQ_HANDLED;
 }
@@ -586,7 +587,7 @@ static irqreturn_t qpnp_resin_irq(int irq, void *_pon)
 	int rc;
 	struct qpnp_pon *pon = _pon;
 	
-	pr_info("[qpnp-power-on] qpnp_resin_irq\n");
+	//pr_info("[qpnp-power-on] qpnp_resin_irq\n");
 
 	rc = qpnp_pon_input_dispatch(pon, PON_RESIN);
 	if (rc)
@@ -604,7 +605,7 @@ static irqreturn_t qpnp_cblpwr_irq(int irq, void *_pon)
 	int rc;
 	struct qpnp_pon *pon = _pon;
 	
-	pr_info("[qpnp-power-on] qpnp_cblpwr_irq\n");
+	//pr_info("[qpnp-power-on] qpnp_cblpwr_irq\n");
 
 	rc = qpnp_pon_input_dispatch(pon, PON_CBLPWR);
 	if (rc)
