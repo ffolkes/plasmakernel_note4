@@ -675,7 +675,7 @@ static void vfsspi_gpio_config(struct vfsspi_devData *data, int onoff)
 #endif
 
 void vfs_mode(unsigned int mode)
-{	
+{
 	mutex_lock(&vfsSpiDev_copy->bufferMutex);
 	if (mode) {
 		// turn on.
