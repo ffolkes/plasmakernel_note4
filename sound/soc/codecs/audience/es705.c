@@ -115,14 +115,18 @@ struct es705_api_access {
 static int network_type = NARROW_BAND;
 static int extra_volume = 0;
 
-extern void zzmoove_boost(unsigned int screen_state, unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);
+extern void zzmoove_boost(unsigned int screen_state,
+						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles,
+						  unsigned int input_cycles, unsigned int devfreq_max_cycles, unsigned int devfreq_mid_cycles);
 
+extern void vk_press_button(int keycode, bool delayed, bool force, bool elastic, bool powerfirst);
 struct timeval time_voice_lastheard;
 struct timeval time_voice_lastirq;
 bool flg_voice_allowturnoff = false;
 extern void press_power(void);
 extern bool flg_power_suspended;
 extern bool sttg_voice_enableturnoff;
+extern bool sttg_voice_enableturnon;
 
 /* Route state for Internal state management */
 enum es705_power_state {
@@ -2912,6 +2916,7 @@ static int es705_put_voice_wakeup_enable_value(struct snd_kcontrol *kcontrol,
 		
 		if (timesince_voice_lastirq > 2000 && timesince_voice_lastirq < 45000 && flg_voice_allowturnoff) {
 			pr_info("[es705/es705_put_voice_wakeup_enable_value] pressing power key (timesince: %d)\n", timesince_voice_lastirq);
+			vk_press_button(158, false, true, false, false);
 			press_power();
 		} else {
 			pr_info("[es705/es705_put_voice_wakeup_enable_value] would be pressing power key (timesince: %d)\n", timesince_voice_lastirq);
@@ -5399,10 +5404,16 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 	u32 cmd_stop[] = {0x9017e000, 0x90180000, 0xffffffff};
 	
 	// TODO: add compiler tags
-	zzmoove_boost(0, 30, 40, 10, 0);
+	zzmoove_boost(0, 30, 40, 10, 0, 20, 0);
 	pr_info("[es705/es705_irq_event] boosting wakeup\n");
 	
 	if (flg_power_suspended) {
+		
+		if (sttg_voice_enableturnon) {
+			pr_info("[es705/es705_irq_event] forcing a wakeup\n");
+			press_power();
+		}
+		
 		flg_voice_allowturnoff = true;
 	}
 	
