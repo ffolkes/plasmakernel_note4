@@ -73,6 +73,8 @@
 #include <dhd_wlfc.h>
 #endif
 
+extern void plasma_wifi_connected(unsigned int state, char *ssid_name);
+
 #ifdef WL11U
 #if !defined(WL_ENABLE_P2P_IF) && !defined(WL_CFG80211_P2P_DEV_IF)
 #error You should enable 'WL_ENABLE_P2P_IF' or 'WL_CFG80211_P2P_DEV_IF' \
@@ -4521,6 +4523,7 @@ wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 #ifdef CUSTOM_SET_CPUCORE
 	dhd_pub_t *dhd = (dhd_pub_t *)(cfg->pub);
 #endif /* CUSTOM_SET_CPUCORE */
+	plasma_wifi_connected(0, "");
 	WL_ERR(("Reason %d\n", reason_code));
 	RETURN_EIO_IF_NOT_UP(cfg);
 	act = *(bool *) wl_read_prof(cfg, dev, WL_PROF_ACT);
@@ -8969,10 +8972,12 @@ wl_notify_connect_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 {
 	bool act;
 	struct net_device *ndev = NULL;
+	struct wlc_ssid *wlcssid;
 	s32 err = 0;
 	u32 event = ntoh32(e->event_type);
 
 	ndev = cfgdev_to_wlc_ndev(cfgdev, cfg);
+	wlcssid = wl_read_prof(cfg, ndev, WL_PROF_SSID);
 
 	if (wl_get_mode_by_netdev(cfg, ndev) == WL_MODE_AP) {
 		err = wl_notify_connect_status_ap(cfg, ndev, e, data);
@@ -8989,12 +8994,11 @@ wl_notify_connect_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 			wl_link_up(cfg);
 			act = true;
 			if (!wl_get_drv_status(cfg, DISCONNECTING, ndev)) {
-					printk("wl_bss_connect_done succeeded with " MACDBG "\n",
-						MAC2STRDBG((u8*)(&e->addr)));
+					printk("wl_bss_connect_done succeeded with " MACDBG " (%s)\n",
+						MAC2STRDBG((u8*)(&e->addr)), wlcssid->SSID);
 					wl_bss_connect_done(cfg, ndev, e, data, true);
-					WL_DBG(("joined in BSS network \"%s\"\n",
-					((struct wlc_ssid *)
-					 wl_read_prof(cfg, ndev, WL_PROF_SSID))->SSID));
+					WL_DBG(("joined in BSS network \"%s\"\n", wlcssid->SSID));
+					plasma_wifi_connected(1, wlcssid->SSID);
 				}
 			wl_update_prof(cfg, ndev, e, &act, WL_PROF_ACT);
 			wl_update_prof(cfg, ndev, NULL, (void *)&e->addr, WL_PROF_BSSID);
@@ -9027,6 +9031,9 @@ wl_notify_connect_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 					/* To make sure disconnect, explictly send dissassoc
 					*  for BSSID 00:00:00:00:00:00 issue
 					*/
+
+					plasma_wifi_connected(0, "");
+
 					scbval.val = WLAN_REASON_DEAUTH_LEAVING;
 
 					memcpy(&scbval.ea, curbssid, ETHER_ADDR_LEN);
