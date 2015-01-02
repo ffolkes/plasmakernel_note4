@@ -32,6 +32,8 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 
+extern void plasma_cable_attached(bool mode);
+
 /*
  * extcon_cable_name suggests the standard cable names for commonly used
  * cable types.
@@ -406,6 +408,11 @@ EXPORT_SYMBOL_GPL(extcon_set_cable_state_);
 int extcon_set_cable_state(struct extcon_dev *edev,
 			const char *cable_name, bool cable_state)
 {
+	if (cable_state)
+		plasma_cable_attached(true);
+	else
+		plasma_cable_attached(false);
+
 	dev_info(edev->dev, "%s: %s is %s\n", __func__,
 			cable_name, (cable_state) ? "attached" : "detached");
 	return extcon_set_cable_state_(edev, extcon_find_cable_index
