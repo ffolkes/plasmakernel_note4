@@ -24,6 +24,8 @@
 
 #define DEFAULT_OVC_POLL_SEC 3
 
+extern unsigned int sttg_pu_cablemode;
+
 struct  ovc {
 	wait_queue_head_t	 delay_wait;
 	struct completion	scanning_done;
@@ -711,6 +713,9 @@ void send_otg_notify(struct otg_notify *n,
 		pr_err("%s otg_notify is null\n", __func__);
 		return;
 	}
+
+	if (sttg_pu_cablemode == 1 && enable)
+		enable = 0;
 
 	pr_info("%s event=%s(%lu) enable=%d\n", __func__,
 			event_string(event), event, enable);
