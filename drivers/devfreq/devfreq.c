@@ -27,7 +27,9 @@
 #include <linux/hrtimer.h>
 #include "governor.h"
 
-extern unsigned long sttg_devfreq_mid_freq;
+extern unsigned long sttg_gpufreq_mid_freq;
+extern unsigned long sttg_gpufreq_min_freq_cable;
+extern bool flg_power_cableattached;
 int flg_ctr_devfreq_max = 0;
 int flg_ctr_devfreq_mid = 0;
 
@@ -186,6 +188,7 @@ int update_devfreq(struct devfreq *devfreq)
 {
 	unsigned long freq;
 	unsigned long cur_freq;
+	unsigned long tmp_gpufreq_freq;
 	int err = 0;
 	u32 flags = 0;
 
@@ -222,17 +225,23 @@ int update_devfreq(struct devfreq *devfreq)
 	} else {
 		
 		// mid boost only applies to the gpu.
-		if (flg_ctr_devfreq_mid > 0
-			&& sttg_devfreq_mid_freq > 0
+		if (((flg_ctr_devfreq_mid > 0 && sttg_gpufreq_mid_freq > 0)
+			|| (flg_power_cableattached && sttg_gpufreq_min_freq_cable > 0))
 			&& strstr(devfreq->governor->name, "msm-adreno-tz")) {
 			
 			devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
 			
-			//pr_info("[devfreq] flg_ctr_devfreq_mid = %d, cur_freq: %ld, target: %ld, sttg: %ld, name: %s\n",
-			//		flg_ctr_devfreq_mid, cur_freq, freq, sttg_devfreq_mid_freq, devfreq->governor->name);
+			if (flg_power_cableattached) {
+				tmp_gpufreq_freq = max(sttg_gpufreq_mid_freq, sttg_gpufreq_min_freq_cable);
+			} else {
+				tmp_gpufreq_freq = sttg_gpufreq_mid_freq;
+			}
 			
-			if (cur_freq < sttg_devfreq_mid_freq || (freq > 0 && freq < sttg_devfreq_mid_freq)) {
-				freq = sttg_devfreq_mid_freq;
+			//pr_info("[devfreq] flg_ctr_devfreq_mid = %d, cur_freq: %ld, target: %ld, sttg: %ld, name: %s, cable: %d\n",
+			//		flg_ctr_devfreq_mid, cur_freq, freq, tmp_gpufreq_freq, devfreq->governor->name, flg_power_cableattached);
+			
+			if (cur_freq < tmp_gpufreq_freq || (freq > 0 && freq < tmp_gpufreq_freq)) {
+				freq = tmp_gpufreq_freq;
 				//pr_info("[devfreq] newfreq: %ld\n", freq);
 			}
 		}
