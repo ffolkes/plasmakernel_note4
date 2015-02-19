@@ -529,6 +529,8 @@ static ssize_t epen_report_rate_show(struct device *dev,
 					 char *buf)
 {
 	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	
+	pr_info("[wacom] report rate: %d\n", wac_i2c->sampling_rate);
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
 				(wac_i2c->sampling_rate == SAMPLING_RATE_120HZ) ? "120Hz" :

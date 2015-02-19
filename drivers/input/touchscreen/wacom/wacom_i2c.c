@@ -20,6 +20,17 @@
 #include "wacom_i2c.h"
 #include "wacom_i2c_flash.h"
 
+extern bool sttg_epen_worryfree;
+extern unsigned int sttg_epen_fixedpressure;
+extern unsigned int sttg_epen_fixedminpressure;
+extern unsigned int sttg_epen_minpressure;
+extern bool flg_pu_locktsp;
+extern bool flg_epen_tsp_block;
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
+
 int wacom_i2c_send(struct wacom_i2c *wac_i2c,
 			  const char *buf, int count, bool mode)
 {
@@ -430,6 +441,9 @@ static int keycode[] = {
 
 void wacom_i2c_softkey(struct wacom_i2c *wac_i2c, s16 key, s16 pressed)
 {
+	if (flg_pu_locktsp)
+		return;
+	
 	if (wac_i2c->pen_prox) {
 		dev_info(&wac_i2c->client->dev,
 				"%s: prox:%d, run release_hover\n",
@@ -618,11 +632,24 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			y = tmp;
 		}
 
-		if (wacom_i2c_coord_range(wac_i2c, &x, &y)) {
+		if (!flg_pu_locktsp
+			&& (!sttg_epen_minpressure
+				|| (pressure > sttg_epen_minpressure || !prox))
+			&& wacom_i2c_coord_range(wac_i2c, &x, &y)) {
+			
 			input_report_abs(wac_i2c->input_dev, ABS_X, x);
 			input_report_abs(wac_i2c->input_dev, ABS_Y, y);
-			input_report_abs(wac_i2c->input_dev,
-					 ABS_PRESSURE, pressure);
+			
+			// if fixedpressure is set, use that, if not, then see if the pressure
+			// is below minpressure, otherwise just use the normal value.
+			if (sttg_epen_fixedpressure)
+				input_report_abs(wac_i2c->input_dev, ABS_PRESSURE, sttg_epen_fixedpressure);
+			else {
+				if (sttg_epen_fixedminpressure && pressure < sttg_epen_fixedminpressure)
+					input_report_abs(wac_i2c->input_dev, ABS_PRESSURE, sttg_epen_fixedminpressure);
+				else
+					input_report_abs(wac_i2c->input_dev, ABS_PRESSURE, pressure);
+			}
 
 #ifdef USE_WACOM_TILT_HEIGH
 			input_report_abs(wac_i2c->input_dev,
@@ -683,7 +710,7 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		}
 	} else {
 
-		if (wac_i2c->pen_prox) {
+		if (wac_i2c->pen_prox && !flg_pu_locktsp) {
 			/* input_report_abs(wac->input_dev,
 			   ABS_X, x); */
 			/* input_report_abs(wac->input_dev,
@@ -785,6 +812,16 @@ static void pen_insert_work(struct work_struct *work)
 	if (wac_i2c->init_fail)
 		return;
 	wac_i2c->pen_insert = !gpio_get_value(wac_i2c->gpio_pen_insert);
+	
+	// boost on remove. mode/max/mid/allcores/input/gpumid/gpumax/user
+	if (!wac_i2c->pen_insert) {
+		zzmoove_boost(0, 5, 20, 5, 50, 50, 0, 20);
+		
+		if (sttg_epen_worryfree)
+			flg_epen_tsp_block = true;
+		
+	} else
+		flg_epen_tsp_block = false;
 
 	dev_info(&wac_i2c->client->dev, "%s: pen %s\n",
 		__func__, wac_i2c->pen_insert ? "instert" : "remove");
