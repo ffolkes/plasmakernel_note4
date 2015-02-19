@@ -32,6 +32,10 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
 extern void plasma_cable_attached(bool mode);
 
 /*
@@ -408,6 +412,9 @@ EXPORT_SYMBOL_GPL(extcon_set_cable_state_);
 int extcon_set_cable_state(struct extcon_dev *edev,
 			const char *cable_name, bool cable_state)
 {
+	// boost on insert/remove. mode/max/mid/allcores/input/gpumid/gpumax/user
+	zzmoove_boost(2, 5, 5, 0, 50, 10, 30, 10);
+	
 	if (cable_state)
 		plasma_cable_attached(true);
 	else

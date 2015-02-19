@@ -26,9 +26,10 @@
 #include <mach/gpio.h>
 #endif
 
-extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles,
-						  unsigned int input_cycles, unsigned int devfreq_max_cycles, unsigned int devfreq_mid_cycles);
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
 
 struct vfsspi_devData *vfsSpiDev_copy = NULL;
 
@@ -1059,7 +1060,7 @@ long vfsspi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 	case VFSSPI_IOCTL_POWER_OFF:
 		pr_info("[fingerprint/vfsspi_ioctl] boosting for unlock!\n");
-		zzmoove_boost(1, 5, 20, 5, 100, 5, 20);
+		zzmoove_boost(1, 5, 20, 5, 100, 5, 20, 0);
 		pr_info("%s VFSSPI_IOCTL_POWER_OFF\n", __func__);
 		if (vfsSpiDev->ldocontrol && vfsSpiDev->ldo_onoff) {
 			vfsspi_regulator_onoff(vfsSpiDev, false);
