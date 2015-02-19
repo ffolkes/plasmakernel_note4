@@ -36,10 +36,28 @@
 #endif
 #include <linux/sec_class.h>
 
-extern bool suspend_flag;
-extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles,
-						  unsigned int input_cycles, unsigned int devfreq_max_cycles, unsigned int devfreq_mid_cycles);
+extern bool flg_power_suspended;
+extern int do_timesince(struct timeval time_start);
+extern unsigned int pu_recording_end(void);
+/*extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);*/
+
+extern bool sttg_pu_tamperevident;
+extern bool sttg_pu_warnled;
+extern unsigned int sttg_gpio_key172_nohold;
+extern bool pu_valid(void);
+extern void pu_setFrontLED(unsigned int mode);
+extern bool flg_pu_tamperevident;
+extern bool flg_pu_locktsp;
+extern unsigned int sttg_pu_blockpower;
+extern void mdnie_toggle_nightmode(void);
+
+struct timeval time_pressed_homekey;
+struct timeval time_pressed_home;
+static bool flg_skip_next = false;
+static int ctr_homepress = 0;
 
 #if defined(CONFIG_SENSORS_HALL)
 static bool flip_cover;
@@ -358,19 +376,100 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	 */
 	static int home_old_state;
 	
-	if (state && button->code == 172) {
+	if (flg_skip_next) {
+		// avoid sending the key-up event.
+		flg_skip_next = false;
+		return;
+	}
+	
+	if (pu_recording_end()) {
+		// pu was recording, drop this press and the next 0.
+		flg_skip_next = true;
+		return;
+	}
+	
+	if (button->code == KEY_HOMEPAGE && flg_pu_locktsp && pu_valid()) {
 		
-		if (suspend_flag) {
-			zzmoove_boost(0, 5, 10, 10, 10, 0, 0);
+		if (flg_power_suspended && state) {
+			
+			if (sttg_pu_blockpower > 1) {
+				// modes 2 or 3.
+				// if we want to block home from turning the phone on, then do it now.
+				return;
+			}
+			
+			if (sttg_pu_tamperevident) {
+				// home key is being pressed and tampermode is set, but we have no way of knowing if this actuallly
+				// woke up the device. so make a timestamp, and compare it on resume.
+				
+				printk(KERN_DEBUG"[KEYS/pu] home tampered!\n");
+				do_gettimeofday(&time_pressed_homekey);
+				
+				input_event(input, type, KEY_HOMEPAGE, 1);
+				input_sync(input);
+				
+				input_event(input, type, KEY_HOMEPAGE, 0);
+				input_sync(input);
+			}
 		} else {
-			zzmoove_boost(0, 25, 50, 30, 50, 30, 50);
+			// screen is on, so block all presses.
+			return;
+		}
+	}
+	
+	// toggle night mode with three home button presses.
+	if (state && button->code == 172 && !flg_pu_locktsp) {
+		
+		// check to see if the 2nd press was fast enough (but not too fast, as that might be erroneous).
+		if (do_timesince(time_pressed_home) > 40
+			&& do_timesince(time_pressed_home) < 135) {
+			
+			// increment for valid press.
+			ctr_homepress++;
+			
+			pr_info("[KEYS/gpio_keys_gpio_report_event] ctr_powerpress: %d, timesince: %d\n",
+					ctr_homepress, do_timesince(time_pressed_home));
+			
+			if (ctr_homepress == 2) {
+				// this is the 3rd press.
+				pr_info("[KEYS/gpio_keys_gpio_report_event] toggling nightmode");
+				mdnie_toggle_nightmode();
+			}
+			
+			// don't send button-up.
+			flg_skip_next = true;
+			
+			// update time.
+			do_gettimeofday(&time_pressed_home);
+			
+			// don't send input.
+			return;
+			
+		} else {
+			// reset.
+			pr_info("[KEYS/gpio_keys_gpio_report_event] reset - ctr_powerpress was: %d, timesince: %d\n",
+					ctr_homepress, do_timesince(time_pressed_home));
+			ctr_homepress = 1;
+		}
+		
+		// update time.
+		do_gettimeofday(&time_pressed_home);
+	}
+	
+	// boosts are handled by the inputbooster in zzmoove now.
+	/*if (state && button->code == 172) {
+		
+		if (flg_power_suspended) {
+			zzmoove_boost(0, 5, 10, 10, 10, 10, 0, 0);
+		} else {
+			zzmoove_boost(0, 10, 15, 10, 50, 25, 50, 0);
 		}
 		
 		pr_info("[KEY] boosted home press\n");
 		
 	} else {
 		pr_info("[KEY] not boosting power press (key: %d, state: %d)\n", button->code, state);
-	}
+	}*/
 
 	if (button->code == KEY_HOMEPAGE) {
 		if (!home_old_state && !state && key_irq_state ) {
@@ -394,6 +493,24 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		input_event(input, type, button->code, !!state);
 	}
 	input_sync(input);
+	
+	if (!flg_power_suspended && sttg_gpio_key172_nohold && state && button->code == KEY_HOMEPAGE) {
+		// if the home button was pressed,
+		// speed things up by immediately sending an up event.
+		
+		printk(KERN_INFO "[KEYS] not holding home, immediately sending 0\n");
+		
+		input_event(input, type, KEY_HOMEPAGE, 0);
+		input_sync(input);
+		
+		if (sttg_gpio_key172_nohold > 1) {
+			// allow press and hold.
+			printk(KERN_INFO "[KEYS] not holding home, immediately sending 1\n");
+			
+			input_event(input, type, KEY_HOMEPAGE, 1);
+			input_sync(input);
+		}
+	}
 }
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
