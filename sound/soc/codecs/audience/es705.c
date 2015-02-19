@@ -115,11 +115,13 @@ struct es705_api_access {
 static int network_type = NARROW_BAND;
 static int extra_volume = 0;
 
-extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles,
-						  unsigned int input_cycles, unsigned int devfreq_max_cycles, unsigned int devfreq_mid_cycles);
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
 
 extern void vk_press_button(int keycode, bool delayed, bool force, bool elastic, bool powerfirst);
+extern void plasma_pu_entrytimeout_cancel(void);
 struct timeval time_voice_lastheard;
 struct timeval time_voice_lastirq;
 bool flg_voice_allowturnoff = false;
@@ -127,6 +129,13 @@ extern void press_power(void);
 extern bool flg_power_suspended;
 extern bool sttg_voice_enableturnoff;
 extern bool sttg_voice_enableturnon;
+extern bool sttg_pu_allow_voice;
+extern bool sttg_pu_tamperevident;
+extern bool sttg_pu_warnled;
+extern bool pu_valid(void);
+extern void pu_setFrontLED(unsigned int mode);
+extern bool flg_pu_tamperevident;
+extern bool flg_pu_locktsp;
 
 /* Route state for Internal state management */
 enum es705_power_state {
@@ -5404,11 +5413,27 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 	u32 cmd_stop[] = {0x9017e000, 0x90180000, 0xffffffff};
 	
 	// TODO: add compiler tags
-	zzmoove_boost(0, 30, 40, 10, 0, 20, 0);
+	zzmoove_boost(0, 30, 40, 10, 0, 20, 0, 0);
 	pr_info("[es705/es705_irq_event] boosting wakeup\n");
 	
 	if (flg_power_suspended) {
 		
+		// cancel the entry timeout.
+		plasma_pu_entrytimeout_cancel();
+
+		if (flg_pu_locktsp && !sttg_pu_allow_voice && pu_valid() && sttg_pu_tamperevident) {
+			// if the screen is off, tampermode is set, and there was a voice wakeup, so trigger the tamper.
+
+			flg_pu_tamperevident = true;
+			printk(KERN_DEBUG"[es705/es705_irq_event] voice tampered!\n");
+
+			if (!sttg_pu_warnled) {
+				// only turn on the tamperled if the warnled isn't coming on,
+				// otherwise it'd set the led 2x in a row.
+				pu_setFrontLED(2); // 2 = tampered
+			}
+		}
+
 		if (sttg_voice_enableturnon) {
 			pr_info("[es705/es705_irq_event] forcing a wakeup\n");
 			press_power();
