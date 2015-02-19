@@ -87,9 +87,11 @@ struct fts_touchkey fts_touchkeys[] = {
 
 extern void plasma_process_tsp_touch_enter(int finger, int touchcount);
 extern int plasma_process_tsp_touch_move(int finger, int x, int y, int pressure);
-extern void plasma_process_tsp_touch_exit(int finger, int touchcount);
+extern void plasma_process_tsp_touch_exit(int finger, int touchcount, int x, int y, int pressure);
+extern int plasma_inject_tsp_x;
+extern int plasma_inject_tsp_y;
 extern bool flg_voice_allowturnoff;
-extern int s2w_switch;
+extern unsigned int ctr_power_suspends;
 
 extern int get_lcd_attached(void);
 extern int boot_mode_recovery;
@@ -294,6 +296,18 @@ static ssize_t enable_hover_store(struct device *dev,
 	}
 	
 	return size;
+}
+
+static unsigned int plasma_lpm_override(void)
+{
+	if (flg_tsp_always_on || ctr_power_suspends < 2) {
+		// if flag is set or we're on our ~first suspend, then stay on.
+		// we do this in anticipation of synapse turning something on
+		// after the screen times out that would have required flg_tsp_always_on.
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 static int fts_write_reg(struct fts_ts_info *info,
@@ -1184,14 +1198,13 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 				break;
 			}*/
 				
-			//pr_info("[tsp] finger: %d IN\n", TouchID);
-				
 			// reset the voice flag since someone is using it.
 			flg_voice_allowturnoff = false;
-
 			info->touch_count++;
 				
 			plasma_process_tsp_touch_enter(TouchID, info->touch_count);
+				
+			//pr_info("[tsp] finger: %d IN eventid: %d\n", TouchID, EventID);
 
 		case EVENTID_MOTION_POINTER:
 	
@@ -1219,10 +1232,39 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 #else
 			z = data[7 + EventNum * FTS_EVENT_SIZE];
 #endif
-			//pr_info("[tsp] finger: %d, x: %d, y: %d, bw: %d, bh: %d, sum: %d, palm: %d\n",
-			//		TouchID, x, y, bw, bh, sumsize, palm);
+			//pr_info("[tsp] eid: %d, finger: %d, x: %d, y: %d, bw: %d, bh: %d, sum: %d, palm: %d, z: %d\n",
+			//		EventID, TouchID, x, y, bw, bh, sumsize, palm, z);
 				
-			plasma_process_tsp_touch_move(TouchID, x, y, max(bw, bh));
+			if (!plasma_process_tsp_touch_move(TouchID, x, y, max(bw, bh)))
+				break;
+				
+			// todo: make this into a function.
+			if (plasma_inject_tsp_x > 0) {
+				
+				input_mt_slot(info->input_dev, TouchID);
+				input_mt_report_slot_state(info->input_dev, MT_TOOL_FINGER, 1 + (palm << 1));
+				input_report_key(info->input_dev, BTN_TOUCH, 1);
+				input_report_key(info->input_dev, BTN_TOOL_FINGER, 1);
+				input_report_abs(info->input_dev, ABS_MT_POSITION_X, plasma_inject_tsp_x);
+				input_report_abs(info->input_dev, ABS_MT_POSITION_Y, plasma_inject_tsp_y);
+				input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, max(bw, bh));
+				input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, min(bw, bh));
+				input_report_abs(info->input_dev, ABS_MT_SUMSIZE, sumsize);
+				input_report_abs(info->input_dev, ABS_MT_PALM, palm);
+				info->finger[TouchID].lx = plasma_inject_tsp_x;
+				info->finger[TouchID].ly = plasma_inject_tsp_y;
+				
+				input_sync(info->input_dev);
+				
+				pr_info("[tsp/move] INJECTED - eid: %d, finger: %d, x: %d, y: %d, bw: %d, bh: %d, sum: %d, palm: %d, z: %d\n",
+						EventID, TouchID, plasma_inject_tsp_x, plasma_inject_tsp_y, bw, bh, sumsize, palm, z);
+				
+				// reset, because we only want to inject once.
+				plasma_inject_tsp_x = -1;
+				
+				pr_info("[tsp/move] CURRENT - eid: %d, finger: %d, x: %d, y: %d, bw: %d, bh: %d, sum: %d, palm: %d, z: %d\n",
+						EventID, TouchID, x, y, bw, bh, sumsize, palm, z);
+			}
 				
 			input_mt_slot(info->input_dev, TouchID);
 			input_mt_report_slot_state(info->input_dev,
@@ -1255,8 +1297,6 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 
 		case EVENTID_LEAVE_POINTER:
 				
-			//pr_info("[tsp] finger: %d OUT\n", TouchID);
-				
 			// don't ignore events if the screen is off.
 			/*if(info->fts_power_mode == FTS_POWER_STATE_LOWPOWER){
 				break;
@@ -1264,7 +1304,40 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 				
 			info->touch_count--;
 				
-			plasma_process_tsp_touch_exit(TouchID, info->touch_count);
+			//pr_info("[tsp] finger: %d OUT eventid: %d\n", TouchID, EventID);
+			
+			// calculate touch data for plasma.
+			x = data[1 + EventNum * FTS_EVENT_SIZE] + ((data[2 + EventNum * FTS_EVENT_SIZE] & 0x0f) << 8);
+			y = ((data[2 + EventNum * FTS_EVENT_SIZE] & 0xf0) >> 4) + (data[3 + EventNum * FTS_EVENT_SIZE] << 4);
+			bw = data[4 + EventNum * FTS_EVENT_SIZE];
+			bh = data[5 + EventNum * FTS_EVENT_SIZE];
+				
+			plasma_process_tsp_touch_exit(TouchID, info->touch_count, x, y, max(bw, bh));
+				
+			// todo: make this into a function.
+			if (plasma_inject_tsp_x > 0) {
+				
+				input_mt_slot(info->input_dev, TouchID);
+				input_mt_report_slot_state(info->input_dev, MT_TOOL_FINGER, 1 + (palm << 1));
+				input_report_key(info->input_dev, BTN_TOUCH, 1);
+				input_report_key(info->input_dev, BTN_TOOL_FINGER, 1);
+				input_report_abs(info->input_dev, ABS_MT_POSITION_X, plasma_inject_tsp_x);
+				input_report_abs(info->input_dev, ABS_MT_POSITION_Y, plasma_inject_tsp_y);
+				input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, max(bw, bh));
+				input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, min(bw, bh));
+				input_report_abs(info->input_dev, ABS_MT_SUMSIZE, sumsize);
+				input_report_abs(info->input_dev, ABS_MT_PALM, palm);
+				info->finger[TouchID].lx = plasma_inject_tsp_x;
+				info->finger[TouchID].ly = plasma_inject_tsp_y;
+				
+				input_sync(info->input_dev);
+				
+				pr_info("[tsp/exit] INJECTED - eid: %d, finger: %d, x: %d, y: %d, bw: %d, bh: %d, sum: %d, palm: %d, z: %d\n",
+						EventID, TouchID, plasma_inject_tsp_x, plasma_inject_tsp_y, bw, bh, sumsize, palm, z);
+				
+				// reset, because we only want to inject once.
+				plasma_inject_tsp_x = -1;
+			}
 
 			input_mt_slot(info->input_dev, TouchID);
 
@@ -2490,6 +2563,7 @@ static int fts_input_open(struct input_dev *dev)
 		fts_command(info, FTS_CMD_HOVER_ON);
 		info->hover_ready = false;
 		info->hover_enabled = true;
+		fts_command(info, FLUSHBUFFER);
 	}
 	
 	info->fts_change_scan_rate(info, FTS_CMD_FAST_SCAN);
@@ -2515,6 +2589,7 @@ static void fts_input_close(struct input_dev *dev)
 		fts_command(info, FTS_CMD_HOVER_OFF);
 		info->hover_enabled = false;
 		info->hover_ready = false;
+		fts_command(info, FLUSHBUFFER);
 	}
 	
 	info->fts_change_scan_rate(info, FTS_CMD_USLOW_SCAN);
@@ -2759,11 +2834,7 @@ static void fts_secure_touch_stop(struct fts_ts_info *info, int blocking)
 
 static int fts_stop_device(struct fts_ts_info *info)
 {
-	if (s2w_switch > 0 || flg_tsp_always_on) {
-		info->lowpower_mode = true;
-	} else {
-		info->lowpower_mode = false;
-	}
+	info->lowpower_mode = plasma_lpm_override();
 	
 	dev_info(&info->client->dev, "%s %s\n",
 			__func__, info->lowpower_mode ? "enter low power mode" : "");
@@ -2777,9 +2848,6 @@ static int fts_stop_device(struct fts_ts_info *info)
 		dev_err(&info->client->dev, "%s already power off\n", __func__);
 		goto out;
 	}
-	
-	// this is just piggybacked here.
-	flg_voice_allowturnoff = false;
 
 	if (info->lowpower_mode) {
 		dev_info(&info->client->dev, "%s lowpower flag:%d\n", __func__, info->lowpower_flag);
@@ -2893,7 +2961,7 @@ static int fts_start_device(struct fts_ts_info *info)
 		}
 #endif
 		
-		//fts_command(info, FLUSHBUFFER);
+		fts_command(info, FLUSHBUFFER);
 
 		if (device_may_wakeup(&info->client->dev))
 			disable_irq_wake(info->client->irq);
