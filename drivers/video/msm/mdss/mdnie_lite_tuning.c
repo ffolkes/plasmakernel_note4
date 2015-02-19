@@ -719,16 +719,12 @@ void mdnie_toggle_nightmode(void)
 		
 		mdnie_nightmode_togglestate = true;
 		
-	} else {
-		// toggle off.
+	} else if (!mdnie_blackout_togglestate) {
+		// only restore if the blackout is off.
 		
-		if (!mdnie_blackout_togglestate) {
-			// only restore this if the blackout is off.
-			mdnie_restoreColors();
-			hijack = hijack_saved;
-			mDNIe_Set_Mode();
-		}
-		
+		mdnie_restoreColors();
+		hijack = hijack_saved;
+		mDNIe_Set_Mode();
 		mdnie_nightmode_togglestate = false;
 	}
 }

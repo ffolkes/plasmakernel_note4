@@ -179,8 +179,8 @@ static struct dsi_cmd panel_osc_type_read_cmds;
 extern int te_set_done;
 #endif
 
-extern int s2w_switch;
-extern bool flg_tsp_always_on;
+//extern int s2w_switch;
+//extern bool flg_tsp_always_on;
 
 static struct mipi_samsung_driver_data msd;
 /*List of supported Panels with HW revision detail
@@ -563,7 +563,7 @@ void mdss_dsi_samsung_panel_reset(struct mdss_panel_data *pdata, int enable)
 		wmb();
 
 	} else {
-		if (!s2w_switch && !flg_tsp_always_on)
+		//if (!s2w_switch && !flg_tsp_always_on)
 			gpio_set_value((ctrl_pdata->rst_gpio), 0);
 
 	}
