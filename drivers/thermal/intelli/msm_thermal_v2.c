@@ -320,6 +320,8 @@ static int vdd_restriction_apply_freq(struct rail *r, int level)
 
 	if (level == r->curr_level)
 		return ret;
+	
+	pr_info("[msm_thermal/vdd_restriction_apply_freq] level: %d\n", level);
 
 	/* level = -1: disable, level = 0,1,2..n: enable */
 	if (level == -1) {
@@ -345,6 +347,8 @@ static int vdd_restriction_apply_freq(struct rail *r, int level)
 static int vdd_restriction_apply_voltage(struct rail *r, int level)
 {
 	int ret = 0;
+	
+	pr_info("[msm_thermal/vdd_restriction_apply_voltage] level: %d\n", level);
 
 	if (r->reg == NULL) {
 		pr_info("Do not have regulator handle:%s, can't apply vdd\n",
@@ -813,6 +817,7 @@ static int therm_get_temp(uint32_t id, enum sensor_id_type type, long *temp)
 {
 	int ret = 0;
 	struct tsens_device tsens_dev;
+	//long tempp = 0;
 
 	if (!temp) {
 		pr_err("Invalid value\n");
@@ -833,8 +838,14 @@ static int therm_get_temp(uint32_t id, enum sensor_id_type type, long *temp)
 		goto get_temp_exit;
 		break;
 	}
+	
+	
 
 	ret = tsens_get_temp(&tsens_dev, temp);
+	
+	//tempp = (long)temp;
+	
+	//pr_info("[thermal/therm_get_temp] getting sensor: %d, value: %ld\n", tsens_dev.sensor_num, tempp);
 	if (ret) {
 		pr_err("Unable to read TSENS sensor %d\n",
 			tsens_dev.sensor_num);
@@ -1015,8 +1026,10 @@ static int do_ocr(void)
 	int i = 0, j = 0;
 	int auto_cnt = 0;
 
-	if (!ocr_enabled)
+	//if (!ocr_enabled)
 		return ret;
+	
+	pr_info("[msm_thermal/do_ocr] start\n");
 
 	mutex_lock(&ocr_mutex);
 	for (i = 0; i < max_tsens_num; i++) {
@@ -1070,13 +1083,15 @@ static int do_vdd_restriction(void)
 	int i = 0;
 	int dis_cnt = 0;
 
-	if (!vdd_rstr_enabled)
+	//if (!vdd_rstr_enabled)
 		return ret;
 
 	if (usefreq && !freq_table_get) {
 		if (check_freq_table())
 			return ret;
 	}
+	
+	pr_info("[msm_thermal/vdd_restriction] start\n");
 
 	mutex_lock(&vdd_rstr_mutex);
 	for (i = 0; i < max_tsens_num; i++) {
@@ -1087,7 +1102,10 @@ static int do_vdd_restriction(void)
 			dis_cnt++;
 			continue;
 		}
+		pr_info("[msm_thermal/vdd_restriction] id: %d, temp: %ld, rstr_temp: %d\n",
+				i, temp, msm_thermal_info.vdd_rstr_temp_degC);
 		if (temp <=  msm_thermal_info.vdd_rstr_temp_degC) {
+			pr_info("[msm_thermal/vdd_restriction] restoring\n");
 			ret = vdd_restriction_apply_all(1);
 			if (ret) {
 				pr_err( \
@@ -1095,8 +1113,10 @@ static int do_vdd_restriction(void)
 				goto exit;
 			}
 			goto exit;
-		} else if (temp > msm_thermal_info.vdd_rstr_temp_hyst_degC)
+		} else if (temp > msm_thermal_info.vdd_rstr_temp_hyst_degC) {
+			pr_info("[msm_thermal/vdd_restriction] overheating (%d), rstr_temp: %d\n", msm_thermal_info.vdd_rstr_temp_hyst_degC, msm_thermal_info.vdd_rstr_temp_degC);
 			dis_cnt++;
+		}
 	}
 	if (dis_cnt == max_tsens_num) {
 		ret = vdd_restriction_apply_all(0);
@@ -1116,6 +1136,10 @@ static int do_psm(void)
 	int ret = 0;
 	int i = 0;
 	int auto_cnt = 0;
+	
+	return 0;
+	
+	pr_info("[msm_thermal/do_psm] start\n");
 
 	mutex_lock(&psm_mutex);
 	for (i = 0; i < max_tsens_num; i++) {
@@ -1162,6 +1186,7 @@ static void __ref do_freq_control(long temp)
 	uint32_t max_freq = cpus[cpu].limited_max_freq;
 
 	if (temp >= msm_thermal_info.limit_temp_degC) {
+		pr_info("[msm_thermal/do_freq_control] temp: %ld, limit: %d, hyslimit: %d\n", temp, msm_thermal_info.limit_temp_degC, msm_thermal_info.temp_hysteresis_degC);
 		if (limit_idx == limit_idx_low)
 			return;
 
@@ -1171,6 +1196,7 @@ static void __ref do_freq_control(long temp)
 		max_freq = table[limit_idx].frequency;
 	} else if (temp < msm_thermal_info.limit_temp_degC -
 		 msm_thermal_info.temp_hysteresis_degC) {
+		pr_info("[msm_thermal/do_freq_control] temp: %ld, limit: %d, hyslimit: %d, delta: %d\n", temp, msm_thermal_info.limit_temp_degC, msm_thermal_info.temp_hysteresis_degC, (msm_thermal_info.limit_temp_degC - msm_thermal_info.temp_hysteresis_degC));
 		if (limit_idx == limit_idx_high)
 			return;
 
@@ -1200,6 +1226,7 @@ static void __ref check_temp(struct work_struct *work)
 {
 	static int limit_init;
 	long temp = 0;
+	//long tempp = 0;
 	int ret = 0;
 
 	ret = therm_get_temp(msm_thermal_info.sensor_id, THERM_TSENS_ID, &temp);
@@ -1208,6 +1235,10 @@ static void __ref check_temp(struct work_struct *work)
 				msm_thermal_info.sensor_id);
 		goto reschedule;
 	}
+	
+	//tempp = (long)temp;
+	
+	pr_info("[msm_thermal/check_temp] getting sensor: %d, value: %ld\n", msm_thermal_info.sensor_id, temp);
 
 	if (!limit_init) {
 		ret = msm_thermal_get_freq_table();
@@ -1222,7 +1253,8 @@ static void __ref check_temp(struct work_struct *work)
 	do_psm();
 	do_ocr();
 	do_freq_control(temp);
-	//pr_info("%s: worker is alive!\n", KBUILD_MODNAME);
+	pr_info("%s: worker is alive! vdd_rstr_enabled: %d, ocr_enabled: %d\n",
+			KBUILD_MODNAME, vdd_rstr_enabled, ocr_enabled);
 reschedule:
 	if (enabled)
 		schedule_delayed_work(&check_temp_work,
@@ -2576,7 +2608,7 @@ static int probe_cc(struct device_node *node, struct msm_thermal_data *data,
 	uint32_t cpu = 0;
 
 	if (num_possible_cpus() > 1) {
-		core_control_enabled = 1;
+		core_control_enabled = 0;
 		hotplug_enabled = 1;
 	}
 
