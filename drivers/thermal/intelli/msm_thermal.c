@@ -26,7 +26,7 @@
 #include <linux/msm_thermal.h>
 #include <soc/qcom/cpufreq.h>
 
-#define DEFAULT_POLLING_MS	500
+#define DEFAULT_POLLING_MS	1000
 /* last 3 minutes based on 250ms polling cycle */
 #define MAX_HISTORY_SZ		((3*60*1000) / DEFAULT_POLLING_MS)
 
@@ -40,21 +40,21 @@ static struct msm_thermal_stat_data msm_thermal_stats;
 
 static int enabled;
 static struct msm_thermal_data msm_thermal_info = {
-	.sensor_id = 5,
+	.sensor_id = 1,
 	.poll_ms = DEFAULT_POLLING_MS,
-	.limit_temp_degC = 80,
+	.limit_temp_degC = 70,
 	.temp_hysteresis_degC = 10,
 	.bootup_freq_step = 2,
 	.bootup_freq_control_mask = 0xf,
-	.core_limit_temp_degC = 85,
+	.core_limit_temp_degC = 75,
 	.core_temp_hysteresis_degC = 10,
 	.core_control_mask = 0xe,
 };
 static uint32_t limited_max_freq_thermal = MSM_CPUFREQ_NO_LIMIT;
 static struct delayed_work check_temp_work;
 static struct workqueue_struct *intellithermal_wq;
-static bool core_control_enabled;
-static uint32_t cpus_offlined;
+bool core_control_enabled;
+uint32_t cpus_offlined;
 static DEFINE_MUTEX(core_control_mutex);
 
 static int limit_idx;
@@ -240,6 +240,8 @@ static void __ref check_temp(struct work_struct *work)
 				KBUILD_MODNAME, tsens_dev.sensor_num);
 		goto reschedule;
 	}
+	
+	pr_info("[msm_thermalv1/check_temp] getting sensor: %d/%d, value: %ld\n", tsens_dev.sensor_num, msm_thermal_info.sensor_id, temp);
 
 	if (hist_index < MAX_HISTORY_SZ)
 		msm_thermal_stats.temp_history[hist_index] = temp;
