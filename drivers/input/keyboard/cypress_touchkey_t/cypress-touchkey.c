@@ -11,6 +11,11 @@
 #include "cypress-touchkey.h"
 #include "cy8cmbr_swd.h"
 
+extern unsigned int pu_recording_end(void);
+extern bool pu_valid(void);
+extern bool flg_pu_locktsp;
+extern bool flg_epen_tsp_block;
+
 struct qpnp_pin_cfg cypress_int_set[] = {
 	{
 		.mode = 0,
@@ -625,9 +630,26 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		goto out;
 	}
 	
+	if (flg_epen_tsp_block) {
+		// ignore all input while spen is out.
+		return IRQ_HANDLED;
+	}
+	
+	if (flg_pu_locktsp && pu_valid()) {
+		// device is locked out. disable touchkeys.
+		printk("[TOUCHKEY/pu] input skipped (flg_pu_locktsp)\n");
+		return IRQ_HANDLED;
+	}
+	
 	if (flg_skip_next) {
 		// avoid sending the key-up event.
 		flg_skip_next = false;
+		return IRQ_HANDLED;
+	}
+	
+	if (pu_recording_end()) {
+		// pu was recording, drop this press.
+		flg_skip_next = true;
 		return IRQ_HANDLED;
 	}
 	
@@ -1047,6 +1069,11 @@ static ssize_t cypress_touchkey_led_control(struct device *dev,
 		dev_err(&info->client->dev, "%s wrong cmd %x\n",
 			__func__, data);
 		return size;
+	}
+	
+	// always keep the leds off when locked.
+	if (flg_pu_locktsp) {
+		data = 0;
 	}
 
 	if (!info->enabled) {
