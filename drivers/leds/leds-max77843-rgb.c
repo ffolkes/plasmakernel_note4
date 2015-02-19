@@ -84,6 +84,47 @@
 				(time < 8000) ? (time-5000)/1000+10 :	 \
 				(time < 12000) ? (time-8000)/2000+13 : 15)
 
+static bool sttg_fled_fade = 0;
+static unsigned int sttg_fled_powermode = 0;
+static unsigned int sttg_fled_high_r_gain = 200;
+static unsigned int sttg_fled_high_g_gain = 210;
+static unsigned int sttg_fled_high_b_gain = 80;
+static unsigned int sttg_fled_low_r_gain = 15;
+static unsigned int sttg_fled_low_g_gain = 10;
+static unsigned int sttg_fled_low_b_gain = 7;
+static unsigned int sttg_fled_charged_r_gain = 80;
+static unsigned int sttg_fled_charged_g_gain = 255;
+static unsigned int sttg_fled_charged_b_gain = 80;
+static unsigned int sttg_fled_charging_r_gain = 255;
+static unsigned int sttg_fled_charging_g_gain = 80;
+static unsigned int sttg_fled_charging_b_gain = 80;
+static unsigned int sttg_fled_missednoti_r_gain = 255;
+static unsigned int sttg_fled_missednoti_g_gain = 255;
+static unsigned int sttg_fled_missednoti_b_gain = 255;
+static unsigned int sttg_fled_blink_on = 0;
+static unsigned int sttg_fled_blink_off = 0;
+static unsigned int sttg_fled_ramp_on = 0;
+static unsigned int sttg_fled_ramp_off = 0;
+
+static struct timer_list timer_alternatefrontled;
+struct an30259a_data *leddata;
+struct work_struct work_controlFrontLED;
+static struct workqueue_struct *wq_controlFrontLED;
+static unsigned int alternateFrontLED_duty1 = 0;
+static unsigned int alternateFrontLED_r1 = 0;
+static unsigned int alternateFrontLED_g1 = 0;
+static unsigned int alternateFrontLED_b1 = 0;
+static unsigned int alternateFrontLED_duty2 = 0;
+static unsigned int alternateFrontLED_r2 = 0;
+static unsigned int alternateFrontLED_g2 = 0;
+static unsigned int alternateFrontLED_b2 = 0;
+static unsigned int alternatefrontled_mode = 0;
+static unsigned int wq_r = 0;
+static unsigned int wq_g = 0;
+static unsigned int wq_b = 0;
+static bool flg_stop_incoming_leds = false;
+static struct wake_lock fled_wake_lock;
+
 static u8 led_dynamic_current = BASE_DYNAMIC_LED_CURRENT;
 static u8 led_lowpower_mode = 0x0;
 
@@ -140,7 +181,7 @@ static int max77843_rgb_number(struct led_classdev *led_cdev,
 
 	for (i = 0; i < 4; i++) {
 		if (led_cdev == &max77843_rgb->led[i]) {
-			pr_info("leds-max77843-rgb: %s, %d\n", __func__, i);
+			//pr_info("leds-max77843-rgb: %s, %d\n", __func__, i);
 			return i;
 		}
 	}
@@ -202,7 +243,7 @@ static void max77843_rgb_set_state(struct led_classdev *led_cdev,
 	int n;
 	int ret;
 
-	pr_info("leds-max77843-rgb: %s\n", __func__);
+	//pr_info("leds-max77843-rgb: %s\n", __func__);
 
 	ret = max77843_rgb_number(led_cdev, &max77843_rgb);
 
@@ -371,6 +412,176 @@ static void max77843_rgb_reset(struct device *dev)
 	max77843_rgb_ramp(dev, 0, 0);
 }
 
+static void controlFrontLED_work(struct work_struct *work)
+{
+	struct max77843_rgb *max77843_rgb = dev_get_drvdata(led_dev);
+	
+	if (!wq_r)
+		max77843_rgb_set_state(&max77843_rgb->led[RED], LED_OFF, LED_DISABLE);
+	else
+		max77843_rgb_set_state(&max77843_rgb->led[RED], wq_r, LED_ALWAYS_ON);
+	
+	if (!wq_g)
+		max77843_rgb_set_state(&max77843_rgb->led[GREEN], LED_OFF, LED_DISABLE);
+	else
+		max77843_rgb_set_state(&max77843_rgb->led[GREEN], wq_g, LED_ALWAYS_ON);
+	
+	if (!wq_b)
+		max77843_rgb_set_state(&max77843_rgb->led[BLUE], LED_OFF, LED_DISABLE);
+	else
+		max77843_rgb_set_state(&max77843_rgb->led[BLUE], wq_b, LED_ALWAYS_ON);
+}
+
+void controlFrontLED(unsigned int r, unsigned int g, unsigned int b)
+{
+	// make sure nothing is out of range.
+	if (r > 255)
+		r = 255;
+	
+	if (g > 255)
+		g = 255;
+	
+	if (b > 255)
+		b = 255;
+	
+	wq_r = r;
+	wq_g = g;
+	wq_b = b;
+	
+	pr_info("[LED/controlFrontLED] control led\n");
+	
+	queue_work_on(0, wq_controlFrontLED, &work_controlFrontLED);
+	
+}
+EXPORT_SYMBOL(controlFrontLED);
+
+static void timerhandler_alternatefrontled(unsigned long data)
+{
+	unsigned int tmp_duty = 0;
+	
+	if (!alternateFrontLED_duty1 || !alternateFrontLED_duty2) {
+		// no duty cycle set one or more colors, just turn all the leds off and exit.
+		
+		// reset led.
+		controlFrontLED(0, 0, 0);
+		
+		flg_stop_incoming_leds = false;
+		
+		// drop wakelock.
+		wake_unlock(&fled_wake_lock);
+		
+		return;
+	}
+	
+	if (!alternatefrontled_mode) {
+		// mode was 0 (aka 1)
+		
+		//pr_info("[LED/timerhandler_alternatefrontled] turning on led2\n");
+		
+		// start color 2.
+		controlFrontLED(alternateFrontLED_r2, alternateFrontLED_g2, alternateFrontLED_b2);
+		tmp_duty = alternateFrontLED_duty2;
+		alternatefrontled_mode = 1;
+		
+	} else {
+		// mode was 1 (aka 2)
+		
+		//pr_info("[LED/timerhandler_alternatefrontled] turning on led1\n");
+		
+		// start color 1.
+		controlFrontLED(alternateFrontLED_r1, alternateFrontLED_g1, alternateFrontLED_b1);
+		tmp_duty = alternateFrontLED_duty1;
+		alternatefrontled_mode = 0;
+	}
+	
+	//pr_info("[LED/timerhandler_alternatefrontled] recycling in %d ms\n", tmp_duty);
+	
+	// start timer that will turn the other color on.
+	mod_timer(&timer_alternatefrontled,
+			  jiffies + msecs_to_jiffies(tmp_duty));
+}
+
+void alternateFrontLED(unsigned int duty1, unsigned int r1, unsigned int g1, unsigned int b1,
+					   unsigned int duty2, unsigned int r2, unsigned int g2, unsigned int b2)
+{
+	if (!duty1 || !duty2) {
+		// disable it.
+		
+		pr_info("[LED/alternateFrontLED] stopping\n");
+		del_timer(&timer_alternatefrontled);
+		
+		// reset led.
+		controlFrontLED(0, 0, 0);
+		
+		flg_stop_incoming_leds = false;
+		
+		// drop wakelock.
+		wake_unlock(&fled_wake_lock);
+		
+		return;
+	}
+	
+	flg_stop_incoming_leds = true;
+	
+	// reset led.
+	controlFrontLED(0, 0, 0);
+	
+	pr_info("[LED/alternateFrontLED] starting\n");
+	
+	// save timing and colors.
+	alternateFrontLED_duty1 = duty1;
+	alternateFrontLED_r1 = r1;
+	alternateFrontLED_g1 = g1;
+	alternateFrontLED_b1 = b1;
+	
+	alternateFrontLED_duty2 = duty2;
+	alternateFrontLED_r2 = r2;
+	alternateFrontLED_g2 = g2;
+	alternateFrontLED_b2 = b2;
+	
+	// start first color.
+	controlFrontLED(r1, g1, b1);
+	alternatefrontled_mode = 0;
+	
+	// start timer that will turn the second color on.
+	mod_timer(&timer_alternatefrontled,
+			  jiffies + msecs_to_jiffies(duty1));
+}
+EXPORT_SYMBOL(alternateFrontLED);
+
+void flashFrontLED(unsigned int duty1, unsigned int r1, unsigned int g1, unsigned int b1)
+{
+	// start wakelock so the flash doesn't get "stuck".
+	wake_lock(&fled_wake_lock);
+	
+	// we don't want any incoming leds to override what we set.
+	flg_stop_incoming_leds = true;
+	
+	// stop pending work.
+	del_timer(&timer_alternatefrontled);
+	
+	// reset led.
+	controlFrontLED(0, 0, 0);
+	
+	// no duty cycle for either color.
+	alternateFrontLED_duty1 = 0;
+	alternateFrontLED_duty2 = 0;
+	
+	// start first color.
+	controlFrontLED(r1, g1, b1);
+	
+	// start timer that will turn it off.
+	mod_timer(&timer_alternatefrontled,
+			  jiffies + msecs_to_jiffies(duty1));
+}
+EXPORT_SYMBOL(flashFrontLED);
+
+static ssize_t show_max77843_rgb_lowpower(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", led_lowpower_mode);
+}
+
 static ssize_t store_max77843_rgb_lowpower(struct device *dev,
 					struct device_attribute *devattr,
 					const char *buf, size_t count)
@@ -383,12 +594,31 @@ static ssize_t store_max77843_rgb_lowpower(struct device *dev,
 		dev_err(dev, "fail to get led_lowpower.\n");
 		return count;
 	}
-
-	led_lowpower_mode = led_lowpower;
-	if (led_lowpower_mode == 1)
+	
+	if (!sttg_fled_powermode) {
+		// don't apply override.
+		
+		led_lowpower_mode = led_lowpower;
+		
+		if (led_lowpower_mode == 1) {
+			led_dynamic_current = BASE_LOW_POWER_CURRENT;
+		} else {
+			led_dynamic_current = BASE_DYNAMIC_LED_CURRENT;
+		}
+		
+	} else if (sttg_fled_powermode == 1) {
+		// low power always.
+		
+		led_lowpower_mode = 1;
 		led_dynamic_current = BASE_LOW_POWER_CURRENT;
-	else
+		
+	} else if (sttg_fled_powermode == 2) {
+		// high power always.
+		
+		led_lowpower_mode = 0;
 		led_dynamic_current = BASE_DYNAMIC_LED_CURRENT;
+	}
+	
 	pr_info("led_lowpower mode set to %i, led_dynamic_current set to %d\n", led_lowpower, led_dynamic_current);
 	dev_dbg(dev, "led_lowpower mode set to %i\n", led_lowpower);
 
@@ -426,7 +656,20 @@ static ssize_t store_max77843_rgb_pattern(struct device *dev,
 {
 	struct max77843_rgb *max77843_rgb = dev_get_drvdata(dev);
 	unsigned int mode = 0;
+	u8 led_r_brightness = 0;
+	u8 led_g_brightness = 0;
+	u8 led_b_brightness = 0;
+	int delay_on_time = 0;
+	int delay_off_time = 0;
+	int ramp_delay_on_time = 0;
+	int ramp_delay_off_time = 0;
 	int ret;
+	
+	if (flg_stop_incoming_leds) {
+		pr_info("leds-max77843-rgb: flg_stop_incoming_leds\n");
+		return count;
+	}
+	
 	pr_info("leds-max77843-rgb: %s, lowpower_mode : %d\n", __func__,led_lowpower_mode);
 
 	ret = sscanf(buf, "%1d", &mode);
@@ -434,6 +677,8 @@ static ssize_t store_max77843_rgb_pattern(struct device *dev,
 		dev_err(dev, "fail to get led_pattern mode.\n");
 		return count;
 	}
+	
+	pr_info("[LED/store_max77843_rgb_pattern] mode: %d\n", mode);
 
 	if (mode > POWERING)
 		return count;
@@ -446,36 +691,161 @@ static ssize_t store_max77843_rgb_pattern(struct device *dev,
 	switch (mode) {
 
 	case CHARGING:
-		max77843_rgb_set_state(&max77843_rgb->led[RED], led_dynamic_current, LED_ALWAYS_ON);
+			
+		if (led_lowpower_mode == 1) {
+			if (sttg_fled_charging_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_charging_r_gain * sttg_fled_low_r_gain) / 255;
+			if (sttg_fled_charging_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_charging_g_gain * sttg_fled_low_g_gain) / 255;
+			if (sttg_fled_charging_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_charging_b_gain * sttg_fled_low_b_gain) / 255;
+		} else {
+			if (sttg_fled_charging_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_charging_r_gain * sttg_fled_high_r_gain) / 255;
+			if (sttg_fled_charging_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_charging_g_gain * sttg_fled_high_g_gain) / 255;
+			if (sttg_fled_charging_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_charging_b_gain * sttg_fled_high_b_gain) / 255;
+		}
+		
+		if (led_r_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[RED], led_r_brightness, LED_ALWAYS_ON);
+		}
+		if (led_g_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[GREEN], led_g_brightness, LED_ALWAYS_ON);
+		}
+		if (led_b_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[BLUE], led_b_brightness, LED_ALWAYS_ON);
+		}
+			
 		break;
+			
 	case CHARGING_ERR:
+			
 		max77843_rgb_blink(dev, 500, 500);
-		max77843_rgb_set_state(&max77843_rgb->led[RED], led_dynamic_current, LED_BLINK);
-		break;
-	case MISSED_NOTI:
-		max77843_rgb_blink(dev, 500, 5000);
-		if(led_lowpower_mode == 1)
-			max77843_rgb_set_state(&max77843_rgb->led[BLUE], 0x0a, LED_BLINK);
+			
+		if (led_lowpower_mode == 1)
+			max77843_rgb_set_state(&max77843_rgb->led[RED], sttg_fled_low_r_gain, LED_BLINK);
 		else
-			max77843_rgb_set_state(&max77843_rgb->led[BLUE], 0x32, LED_BLINK);
+			max77843_rgb_set_state(&max77843_rgb->led[RED], sttg_fled_high_r_gain, LED_BLINK);
+			
 		break;
+			
+	case MISSED_NOTI:
+			
+		delay_on_time = 500;
+		delay_off_time = 5000;
+		
+		if (sttg_fled_fade) {
+			
+			if (sttg_fled_ramp_on)
+				ramp_delay_on_time = sttg_fled_ramp_on;
+			else
+				ramp_delay_on_time = delay_on_time;
+			
+			if (sttg_fled_ramp_off)
+				ramp_delay_off_time = sttg_fled_ramp_off;
+			else
+				ramp_delay_off_time = delay_off_time;
+			
+			max77843_rgb_ramp(dev, ramp_delay_on_time, ramp_delay_off_time);
+			
+		} else {
+			max77843_rgb_ramp(dev, 0, 0);
+		}
+			
+		// override blink delays.
+		if (sttg_fled_blink_on)
+			delay_on_time = sttg_fled_blink_on;
+		
+		if (sttg_fled_blink_off)
+			delay_off_time = sttg_fled_blink_off;
+		
+		max77843_rgb_blink(dev, delay_on_time, delay_off_time);
+			
+		if (led_lowpower_mode == 1) {
+			if (sttg_fled_missednoti_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_missednoti_r_gain * sttg_fled_low_r_gain) / 255;
+			if (sttg_fled_missednoti_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_missednoti_g_gain * sttg_fled_low_g_gain) / 255;
+			if (sttg_fled_missednoti_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_missednoti_b_gain * sttg_fled_low_b_gain) / 255;
+		} else {
+			if (sttg_fled_missednoti_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_missednoti_r_gain * sttg_fled_high_r_gain) / 255;
+			if (sttg_fled_missednoti_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_missednoti_g_gain * sttg_fled_high_g_gain) / 255;
+			if (sttg_fled_missednoti_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_missednoti_b_gain * sttg_fled_high_b_gain) / 255;
+		}
+			
+		if (led_r_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[RED], led_r_brightness, LED_BLINK);
+		}
+		if (led_g_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[GREEN], led_g_brightness, LED_BLINK);
+		}
+		if (led_b_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[BLUE], led_b_brightness, LED_BLINK);
+		}
+			
+		break;
+			
 	case LOW_BATTERY:
+			
 		max77843_rgb_blink(dev, 500, 5000);
-		max77843_rgb_set_state(&max77843_rgb->led[RED], led_dynamic_current, LED_BLINK);
+			
+		if (led_lowpower_mode == 1)
+			max77843_rgb_set_state(&max77843_rgb->led[RED], sttg_fled_low_r_gain, LED_BLINK);
+		else
+			max77843_rgb_set_state(&max77843_rgb->led[RED], sttg_fled_high_r_gain, LED_BLINK);
+			
 		break;
+			
 	case FULLY_CHARGED:
-		max77843_rgb_set_state(&max77843_rgb->led[GREEN], led_dynamic_current, LED_ALWAYS_ON);
+			
+		if (led_lowpower_mode == 1) {
+			if (sttg_fled_charged_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_charged_r_gain * sttg_fled_low_r_gain) / 255;
+			if (sttg_fled_charged_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_charged_g_gain * sttg_fled_low_g_gain) / 255;
+			if (sttg_fled_charged_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_charged_b_gain * sttg_fled_low_b_gain) / 255;
+		} else {
+			if (sttg_fled_charged_r_gain && sttg_fled_low_r_gain)
+				led_r_brightness = (sttg_fled_charged_r_gain * sttg_fled_high_r_gain) / 255;
+			if (sttg_fled_charged_g_gain && sttg_fled_low_g_gain)
+				led_g_brightness = (sttg_fled_charged_g_gain * sttg_fled_high_g_gain) / 255;
+			if (sttg_fled_charged_b_gain && sttg_fled_low_b_gain)
+				led_b_brightness = (sttg_fled_charged_b_gain * sttg_fled_high_b_gain) / 255;
+		}
+		
+		if (led_r_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[RED], led_r_brightness, LED_ALWAYS_ON);
+		}
+		if (led_g_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[GREEN], led_g_brightness, LED_ALWAYS_ON);
+		}
+		if (led_b_brightness) {
+			max77843_rgb_set_state(&max77843_rgb->led[BLUE], led_b_brightness, LED_ALWAYS_ON);
+		}
+			
 		break;
+			
 	case POWERING:
+			
 		max77843_rgb_ramp(dev, 800, 800);
 		max77843_rgb_blink(dev, 200, 200);
-		if(led_lowpower_mode == 1)
-			max77843_rgb_set_state(&max77843_rgb->led[BLUE], 0x0a, LED_ALWAYS_ON);
+			
+		if (led_lowpower_mode == 1)
+			max77843_rgb_set_state(&max77843_rgb->led[BLUE], sttg_fled_low_b_gain, LED_ALWAYS_ON);
 		else
-			max77843_rgb_set_state(&max77843_rgb->led[BLUE], 0x32, LED_ALWAYS_ON);
+			max77843_rgb_set_state(&max77843_rgb->led[BLUE], sttg_fled_high_b_gain, LED_ALWAYS_ON);
 
 		max77843_rgb_set_state(&max77843_rgb->led[GREEN], led_dynamic_current, LED_BLINK);
+			
 		break;
+			
 	default:
 		break;
 	}
@@ -491,10 +861,19 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 	int led_brightness = 0;
 	int delay_on_time = 0;
 	int delay_off_time = 0;
+	int ramp_delay_on_time = 0;
+	int ramp_delay_off_time = 0;
 	u8 led_r_brightness = 0;
 	u8 led_g_brightness = 0;
 	u8 led_b_brightness = 0;
 	int ret;
+	
+	pr_info("[LED/store_max77843_rgb_blink]\n");
+	
+	if (flg_stop_incoming_leds) {
+		pr_info("leds-max77843-rgb: flg_stop_incoming_leds\n");
+		return count;
+	}
 
 	ret = sscanf(buf, "0x%8x %5d %5d", &led_brightness,
 					&delay_on_time, &delay_off_time);
@@ -502,6 +881,13 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 		dev_err(dev, "fail to get led_blink value.\n");
 		return count;
 	}
+	
+	// override blink delays.
+	if (sttg_fled_blink_on)
+		delay_on_time = sttg_fled_blink_on;
+	
+	if (sttg_fled_blink_off)
+		delay_off_time = sttg_fled_blink_off;
 
 	/*Reset led*/
 	max77843_rgb_reset(dev);
@@ -509,14 +895,34 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 	led_r_brightness = (led_brightness & LED_R_MASK) >> 16;
 	led_g_brightness = (led_brightness & LED_G_MASK) >> 8;
 	led_b_brightness = led_brightness & LED_B_MASK;
+	
+	pr_info("[FLED] r: %d, g: %d, b: %d, dyncur: %d, lowpower: %d\n",
+			led_r_brightness, led_g_brightness, led_b_brightness, led_dynamic_current, led_lowpower_mode);
 
 	/* In user case, LED current is restricted to less than 2mA */
-	led_r_brightness = (led_r_brightness * led_dynamic_current) / LED_MAX_CURRENT;
-	led_g_brightness = (led_g_brightness * led_dynamic_current) / LED_MAX_CURRENT;
-	if(led_lowpower_mode == 1)
-		led_b_brightness = (led_b_brightness * 0x0a) / LED_MAX_CURRENT;
-	else
-		led_b_brightness = (led_b_brightness * 0x32) / LED_MAX_CURRENT;
+	
+	if (led_lowpower_mode == 1) {
+		led_r_brightness = (led_r_brightness * sttg_fled_low_r_gain) / 255;
+		led_g_brightness = (led_g_brightness * sttg_fled_low_g_gain) / 255;
+		led_b_brightness = (led_b_brightness * sttg_fled_low_b_gain) / 255;
+	} else {
+		led_r_brightness = (led_r_brightness * sttg_fled_high_r_gain) / 255;
+		led_g_brightness = (led_g_brightness * sttg_fled_high_g_gain) / 255;
+		led_b_brightness = (led_b_brightness * sttg_fled_high_b_gain) / 255;
+	}
+	
+	pr_info("[FLED] now r: %d, g: %d, b: %d\n", led_r_brightness, led_g_brightness, led_b_brightness);
+	
+	/*if (led_r_brightness == led_g_brightness && led_r_brightness == led_b_brightness) {
+		// neutral color.
+		
+		if (led_lowpower_mode == 1)
+			led_b_brightness = ((led_r_brightness * sttg_fled_blueinwhite_pct) / 100);
+		else
+			led_b_brightness = ((led_r_brightness * sttg_fled_blueinwhite_pct) / 100);
+		
+		pr_info("[FLED] neutral (r: %d, g: %d), blue reduced to: %d\n", led_r_brightness, led_g_brightness, led_b_brightness);
+	}*/
 
 	if (led_r_brightness) {
 		max77843_rgb_set_state(&max77843_rgb->led[RED], led_r_brightness, LED_BLINK);
@@ -527,8 +933,31 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 	if (led_b_brightness) {
 		max77843_rgb_set_state(&max77843_rgb->led[BLUE], led_b_brightness, LED_BLINK);
 	}
+	
 	/*Set LED blink mode*/
+	
+	if (sttg_fled_fade) {
+		
+		if (sttg_fled_ramp_on)
+			ramp_delay_on_time = sttg_fled_ramp_on;
+		else
+			ramp_delay_on_time = delay_on_time;
+		
+		if (sttg_fled_ramp_off)
+			ramp_delay_off_time = sttg_fled_ramp_off;
+		else
+			ramp_delay_off_time = delay_off_time;
+		
+		max77843_rgb_ramp(dev, ramp_delay_on_time, ramp_delay_off_time);
+		
+	} else {
+		max77843_rgb_ramp(dev, 0, 0);
+	}
+	
 	max77843_rgb_blink(dev, delay_on_time, delay_off_time);
+	
+	pr_info("[FLED] blink - on: %d, off: %d, rampon: %d, rampoff: %d, fademode: %d\n",
+			delay_on_time, delay_off_time, ramp_delay_on_time, ramp_delay_off_time, sttg_fled_fade);
 
 	pr_info("leds-max77843-rgb: %s\n", __func__);
 	dev_dbg(dev, "led_blink is called, Color:0x%X Brightness:%i\n",
@@ -544,6 +973,8 @@ static ssize_t store_led_r(struct device *dev,
 	unsigned int brightness;
 	char buff[10] = {0,};
 	int cnt, ret;
+	
+	pr_info("[LED/store_led_r]\n");
 
 	cnt = count;
 	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
@@ -571,6 +1002,8 @@ static ssize_t store_led_g(struct device *dev,
 	unsigned int brightness;
 	char buff[10] = {0,};
 	int cnt, ret;
+	
+	pr_info("[LED/store_led_g]\n");
 
 	cnt = count;
 	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
@@ -598,6 +1031,8 @@ static ssize_t store_led_b(struct device *dev,
 	unsigned int brightness;
 	char buff[10] = {0,};
 	int cnt, ret;
+	
+	pr_info("[LED/store_led_b]\n");
 
 	cnt = count;
 	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
@@ -615,6 +1050,500 @@ static ssize_t store_led_b(struct device *dev,
 	}
 out:
 	pr_info("leds-max77843-rgb: %s\n", __func__);
+	return count;
+}
+
+static ssize_t show_fled_fade(struct device *dev,
+								 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_fade);
+}
+
+static ssize_t store_fled_fade(struct device *dev,
+								  struct device_attribute *attr,
+								  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0) {
+		
+		if (data > 1)
+			data = 1;
+		
+		sttg_fled_fade = data;
+		pr_info("[FLED] STORE - sttg_fled_fade has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_powermode(struct device *dev,
+								   struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_powermode);
+}
+
+static ssize_t store_fled_powermode(struct device *dev,
+									struct device_attribute *attr,
+									const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 2) {
+		
+		sttg_fled_powermode = data;
+		
+		if (data == 1)
+			led_lowpower_mode = 1;
+		else if (data == 2)
+			led_lowpower_mode = 0;
+		
+		pr_info("[FLED] STORE - sttg_fled_powermode has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_high_r_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_high_r_gain);
+}
+
+static ssize_t store_fled_high_r_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_high_r_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_high_r_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_high_g_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_high_g_gain);
+}
+
+static ssize_t store_fled_high_g_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_high_g_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_high_g_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_high_b_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_high_b_gain);
+}
+
+static ssize_t store_fled_high_b_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_high_b_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_high_b_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_low_r_gain(struct device *dev,
+									struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_low_r_gain);
+}
+
+static ssize_t store_fled_low_r_gain(struct device *dev,
+									 struct device_attribute *attr,
+									 const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_low_r_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_low_r_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_low_g_gain(struct device *dev,
+									struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_low_g_gain);
+}
+
+static ssize_t store_fled_low_g_gain(struct device *dev,
+									 struct device_attribute *attr,
+									 const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_low_g_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_low_g_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_low_b_gain(struct device *dev,
+									struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_low_b_gain);
+}
+
+static ssize_t store_fled_low_b_gain(struct device *dev,
+									 struct device_attribute *attr,
+									 const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_low_b_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_low_b_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charged_r_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charged_r_gain);
+}
+
+static ssize_t store_fled_charged_r_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charged_r_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charged_r_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charged_g_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charged_g_gain);
+}
+
+static ssize_t store_fled_charged_g_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charged_g_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charged_g_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charged_b_gain(struct device *dev,
+									 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charged_b_gain);
+}
+
+static ssize_t store_fled_charged_b_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charged_b_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charged_b_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charging_r_gain(struct device *dev,
+										 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charging_r_gain);
+}
+
+static ssize_t store_fled_charging_r_gain(struct device *dev,
+										  struct device_attribute *attr,
+										  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charging_r_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charging_r_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charging_g_gain(struct device *dev,
+										 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charging_g_gain);
+}
+
+static ssize_t store_fled_charging_g_gain(struct device *dev,
+										  struct device_attribute *attr,
+										  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charging_g_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charging_g_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_charging_b_gain(struct device *dev,
+										 struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_charging_b_gain);
+}
+
+static ssize_t store_fled_charging_b_gain(struct device *dev,
+										  struct device_attribute *attr,
+										  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_charging_b_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_charging_b_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_missednoti_r_gain(struct device *dev,
+										   struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_missednoti_r_gain);
+}
+
+static ssize_t store_fled_missednoti_r_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_missednoti_r_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_missednoti_r_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_missednoti_g_gain(struct device *dev,
+										   struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_missednoti_g_gain);
+}
+
+static ssize_t store_fled_missednoti_g_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_missednoti_g_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_missednoti_g_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_missednoti_b_gain(struct device *dev,
+										   struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_missednoti_b_gain);
+}
+
+static ssize_t store_fled_missednoti_b_gain(struct device *dev,
+									  struct device_attribute *attr,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0 && data <= 255) {
+		sttg_fled_missednoti_b_gain = data;
+		pr_info("[FLED] STORE - sttg_fled_missednoti_b_gain has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_blink_on(struct device *dev,
+								  struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_blink_on);
+}
+
+static ssize_t store_fled_blink_on(struct device *dev,
+								   struct device_attribute *attr,
+								   const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0) {
+		sttg_fled_blink_on = data;
+		pr_info("[FLED] STORE - sttg_fled_blink_on has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_blink_off(struct device *dev,
+								   struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_blink_off);
+}
+
+static ssize_t store_fled_blink_off(struct device *dev,
+									struct device_attribute *attr,
+									const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0) {
+		sttg_fled_blink_off = data;
+		pr_info("[FLED] STORE - sttg_fled_blink_off has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_ramp_on(struct device *dev,
+								  struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_ramp_on);
+}
+
+static ssize_t store_fled_ramp_on(struct device *dev,
+								  struct device_attribute *attr,
+								  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0) {
+		sttg_fled_ramp_on = data;
+		pr_info("[FLED] STORE - sttg_fled_ramp_on has been set to: %d\n", data);
+	}
+	
+	return count;
+}
+
+static ssize_t show_fled_ramp_off(struct device *dev,
+								  struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", sttg_fled_ramp_off);
+}
+
+static ssize_t store_fled_ramp_off(struct device *dev,
+								   struct device_attribute *attr,
+								   const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	
+	ret = sscanf(buf, "%u\n", &data);
+	
+	if (ret && data >= 0) {
+		sttg_fled_ramp_off = data;
+		pr_info("[FLED] STORE - sttg_fled_ramp_off has been set to: %d\n", data);
+	}
+	
 	return count;
 }
 
@@ -678,6 +1607,8 @@ static ssize_t led_blink_store(struct device *dev,
 	unsigned int blink_set;
 	int n = 0;
 	int i;
+	
+	pr_info("[LED/led_blink_store]\n");
 
 	if (!sscanf(buf, "%1d", &blink_set)) {
 		dev_err(dev, "can not write led_blink\n");
@@ -692,6 +1623,12 @@ static ssize_t led_blink_store(struct device *dev,
 	for (i = 0; i < 4; i++) {
 		if (dev == max77843_rgb_num->led[i].dev)
 			n = i;
+	}
+	
+	if (sttg_fled_fade) {
+		max77843_rgb_ramp(max77843_rgb_num->led[n].dev->parent,
+						   max77843_rgb->delay_on_times_ms,
+						   max77843_rgb->delay_off_times_ms);
 	}
 
 	max77843_rgb_blink(max77843_rgb_num->led[n].dev->parent,
@@ -718,7 +1655,28 @@ static DEVICE_ATTR(led_b, 0660, NULL, store_led_b);
 static DEVICE_ATTR(led_pattern, 0660, NULL, store_max77843_rgb_pattern);
 static DEVICE_ATTR(led_blink, 0660, NULL,  store_max77843_rgb_blink);
 static DEVICE_ATTR(led_brightness, 0660, NULL, store_max77843_rgb_brightness);
-static DEVICE_ATTR(led_lowpower, 0660, NULL,  store_max77843_rgb_lowpower);
+static DEVICE_ATTR(led_lowpower, 0660, show_max77843_rgb_lowpower, store_max77843_rgb_lowpower);
+static DEVICE_ATTR(fled_fade, 0660, show_fled_fade, store_fled_fade);
+static DEVICE_ATTR(fled_powermode, 0660, show_fled_powermode, store_fled_powermode);
+static DEVICE_ATTR(fled_high_r_gain, 0660, show_fled_high_r_gain, store_fled_high_r_gain);
+static DEVICE_ATTR(fled_high_g_gain, 0660, show_fled_high_g_gain, store_fled_high_g_gain);
+static DEVICE_ATTR(fled_high_b_gain, 0660, show_fled_high_b_gain, store_fled_high_b_gain);
+static DEVICE_ATTR(fled_low_r_gain, 0660, show_fled_low_r_gain, store_fled_low_r_gain);
+static DEVICE_ATTR(fled_low_g_gain, 0660, show_fled_low_g_gain, store_fled_low_g_gain);
+static DEVICE_ATTR(fled_low_b_gain, 0660, show_fled_low_b_gain, store_fled_low_b_gain);
+static DEVICE_ATTR(fled_charged_r_gain, 0660, show_fled_charged_r_gain, store_fled_charged_r_gain);
+static DEVICE_ATTR(fled_charged_g_gain, 0660, show_fled_charged_g_gain, store_fled_charged_g_gain);
+static DEVICE_ATTR(fled_charged_b_gain, 0660, show_fled_charged_b_gain, store_fled_charged_b_gain);
+static DEVICE_ATTR(fled_charging_r_gain, 0660, show_fled_charging_r_gain, store_fled_charging_r_gain);
+static DEVICE_ATTR(fled_charging_g_gain, 0660, show_fled_charging_g_gain, store_fled_charging_g_gain);
+static DEVICE_ATTR(fled_charging_b_gain, 0660, show_fled_charging_b_gain, store_fled_charging_b_gain);
+static DEVICE_ATTR(fled_missednoti_r_gain, 0660, show_fled_missednoti_r_gain, store_fled_missednoti_r_gain);
+static DEVICE_ATTR(fled_missednoti_g_gain, 0660, show_fled_missednoti_g_gain, store_fled_missednoti_g_gain);
+static DEVICE_ATTR(fled_missednoti_b_gain, 0660, show_fled_missednoti_b_gain, store_fled_missednoti_b_gain);
+static DEVICE_ATTR(fled_blink_on, 0660, show_fled_blink_on, store_fled_blink_on);
+static DEVICE_ATTR(fled_blink_off, 0660, show_fled_blink_off, store_fled_blink_off);
+static DEVICE_ATTR(fled_ramp_on, 0660, show_fled_ramp_on, store_fled_ramp_on);
+static DEVICE_ATTR(fled_ramp_off, 0660, show_fled_ramp_off, store_fled_ramp_off);
 #endif
 
 static struct attribute *led_class_attrs[] = {
@@ -741,6 +1699,27 @@ static struct attribute *sec_led_attributes[] = {
 	&dev_attr_led_blink.attr,
 	&dev_attr_led_brightness.attr,
 	&dev_attr_led_lowpower.attr,
+	&dev_attr_fled_fade.attr,
+	&dev_attr_fled_powermode.attr,
+	&dev_attr_fled_high_r_gain.attr,
+	&dev_attr_fled_high_g_gain.attr,
+	&dev_attr_fled_high_b_gain.attr,
+	&dev_attr_fled_low_r_gain.attr,
+	&dev_attr_fled_low_g_gain.attr,
+	&dev_attr_fled_low_b_gain.attr,
+	&dev_attr_fled_charged_r_gain.attr,
+	&dev_attr_fled_charged_g_gain.attr,
+	&dev_attr_fled_charged_b_gain.attr,
+	&dev_attr_fled_charging_r_gain.attr,
+	&dev_attr_fled_charging_g_gain.attr,
+	&dev_attr_fled_charging_b_gain.attr,
+	&dev_attr_fled_missednoti_r_gain.attr,
+	&dev_attr_fled_missednoti_g_gain.attr,
+	&dev_attr_fled_missednoti_b_gain.attr,
+	&dev_attr_fled_blink_on.attr,
+	&dev_attr_fled_blink_off.attr,
+	&dev_attr_fled_ramp_on.attr,
+	&dev_attr_fled_ramp_off.attr,
 	NULL,
 };
 
@@ -827,6 +1806,14 @@ static int max77843_rgb_probe(struct platform_device *pdev)
 
 #endif
 #endif
+	
+	wq_controlFrontLED = alloc_workqueue("controlFrontLED_wq", WQ_HIGHPRI, 0);
+	
+	INIT_WORK(&work_controlFrontLED, controlFrontLED_work);
+	
+	setup_timer(&timer_alternatefrontled, timerhandler_alternatefrontled, 0);
+	
+	wake_lock_init(&fled_wake_lock, WAKE_LOCK_SUSPEND, "wake_plasma_fled");
 
 	pr_info("leds-max77843-rgb: %s done\n", __func__);
 
