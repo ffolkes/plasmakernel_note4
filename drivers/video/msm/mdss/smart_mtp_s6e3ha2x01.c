@@ -113,7 +113,9 @@ int color_mods[5][21] = {
     {  0,  0, -5,  18,  16,  10, 0, 0, -3, 0, 0, -3, 0, 0, -3, 0, 0, -3, 0, 0, -3 }
 };
 unsigned int panelval = 2;
-extern int mdss_dsi_refresh_panel(unsigned char lock);
+extern int mipi_samsung_disp_send_cmd(
+    enum mipi_samsung_cmd_list cmd,
+    unsigned char lock);
 
 static int char_to_int(char data1)
 {
@@ -5260,5 +5262,5 @@ void panel_load_colors(unsigned int val)
 {
     panelval = val;
     wrap_smart_dimming_init();
-    mdss_dsi_refresh_panel(true);
+    mipi_samsung_disp_send_cmd(PANEL_BRIGHT_CTRL, true);
 }
