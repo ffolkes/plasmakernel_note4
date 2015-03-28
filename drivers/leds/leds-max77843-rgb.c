@@ -84,6 +84,9 @@
 				(time < 8000) ? (time-5000)/1000+10 :	 \
 				(time < 12000) ? (time-8000)/2000+13 : 15)
 
+extern bool pu_checkBlackout(void);
+extern bool sttg_pu_blockleds;
+
 static bool sttg_fled_fade = 0;
 static unsigned int sttg_fled_powermode = 0;
 static unsigned int sttg_fled_high_r_gain = 200;
@@ -448,6 +451,13 @@ void controlFrontLED(unsigned int r, unsigned int g, unsigned int b)
 	wq_g = g;
 	wq_b = b;
 	
+	// if we're locked out and don't want leds on, turn them off.
+	if (pu_checkBlackout() && sttg_pu_blockleds) {
+		wq_r = 0;
+		wq_g = 0;
+		wq_b = 0;
+	}
+	
 	pr_info("[LED/controlFrontLED] control led\n");
 	
 	queue_work_on(0, wq_controlFrontLED, &work_controlFrontLED);
@@ -504,8 +514,10 @@ static void timerhandler_alternatefrontled(unsigned long data)
 void alternateFrontLED(unsigned int duty1, unsigned int r1, unsigned int g1, unsigned int b1,
 					   unsigned int duty2, unsigned int r2, unsigned int g2, unsigned int b2)
 {
-	if (!duty1 || !duty2) {
-		// disable it.
+	if ((pu_checkBlackout() && sttg_pu_blockleds)
+		|| !duty1 || !duty2) {
+		// disable it if we're locked out and leds are blocked,
+		// OR - if any duty cycle is 0
 		
 		pr_info("[LED/alternateFrontLED] stopping\n");
 		del_timer(&timer_alternatefrontled);
@@ -551,6 +563,10 @@ EXPORT_SYMBOL(alternateFrontLED);
 
 void flashFrontLED(unsigned int duty1, unsigned int r1, unsigned int g1, unsigned int b1)
 {
+	// if we're locked out and don't want leds on, quit now.
+	if (pu_checkBlackout() && sttg_pu_blockleds)
+		return;
+	
 	// start wakelock so the flash doesn't get "stuck".
 	wake_lock(&fled_wake_lock);
 	
@@ -665,10 +681,10 @@ static ssize_t store_max77843_rgb_pattern(struct device *dev,
 	int ramp_delay_off_time = 0;
 	int ret;
 	
-	if (flg_stop_incoming_leds) {
-		pr_info("leds-max77843-rgb: flg_stop_incoming_leds\n");
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
 		return count;
-	}
 	
 	pr_info("leds-max77843-rgb: %s, lowpower_mode : %d\n", __func__,led_lowpower_mode);
 
@@ -868,12 +884,12 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 	u8 led_b_brightness = 0;
 	int ret;
 	
-	pr_info("[LED/store_max77843_rgb_blink]\n");
-	
-	if (flg_stop_incoming_leds) {
-		pr_info("leds-max77843-rgb: flg_stop_incoming_leds\n");
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
 		return count;
-	}
+	
+	pr_info("[LED/store_max77843_rgb_blink]\n");
 
 	ret = sscanf(buf, "0x%8x %5d %5d", &led_brightness,
 					&delay_on_time, &delay_off_time);
@@ -974,6 +990,11 @@ static ssize_t store_led_r(struct device *dev,
 	char buff[10] = {0,};
 	int cnt, ret;
 	
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
+		return count;
+	
 	pr_info("[LED/store_led_r]\n");
 
 	cnt = count;
@@ -985,6 +1006,14 @@ static ssize_t store_led_r(struct device *dev,
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;
 	}
+	pr_info("[FLED/red] was r: %d\n", brightness);
+	
+	if (led_lowpower_mode == 1)
+		brightness = (brightness * sttg_fled_low_r_gain) / 255;
+	else
+		brightness = (brightness * sttg_fled_high_r_gain) / 255;
+	
+	pr_info("[FLED/red] now r: %d\n", brightness);
 	if (brightness != 0) {
 		max77843_rgb_set_state(&max77843_rgb->led[RED], brightness, LED_ALWAYS_ON);
 	} else {
@@ -1003,6 +1032,11 @@ static ssize_t store_led_g(struct device *dev,
 	char buff[10] = {0,};
 	int cnt, ret;
 	
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
+		return count;
+	
 	pr_info("[LED/store_led_g]\n");
 
 	cnt = count;
@@ -1014,6 +1048,14 @@ static ssize_t store_led_g(struct device *dev,
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;
 	}
+	pr_info("[FLED/green] was g: %d\n", brightness);
+	
+	if (led_lowpower_mode == 1)
+		brightness = (brightness * sttg_fled_low_g_gain) / 255;
+	else
+		brightness = (brightness * sttg_fled_high_g_gain) / 255;
+	
+	pr_info("[FLED/green] now g: %d\n", brightness);
 	if (brightness != 0) {
 		max77843_rgb_set_state(&max77843_rgb->led[GREEN], brightness, LED_ALWAYS_ON);
 	} else {
@@ -1032,6 +1074,11 @@ static ssize_t store_led_b(struct device *dev,
 	char buff[10] = {0,};
 	int cnt, ret;
 	
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
+		return count;
+	
 	pr_info("[LED/store_led_b]\n");
 
 	cnt = count;
@@ -1043,6 +1090,14 @@ static ssize_t store_led_b(struct device *dev,
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;
 	}
+	pr_info("[FLED/blue] was b: %d\n", brightness);
+	
+	if (led_lowpower_mode == 1)
+		brightness = (brightness * sttg_fled_low_b_gain) / 255;
+	else
+		brightness = (brightness * sttg_fled_high_b_gain) / 255;
+	
+	pr_info("[FLED/blue] now b: %d\n", brightness);
 	if (brightness != 0) {
 		max77843_rgb_set_state(&max77843_rgb->led[BLUE], brightness, LED_ALWAYS_ON);
 	} else	{
@@ -1607,6 +1662,11 @@ static ssize_t led_blink_store(struct device *dev,
 	unsigned int blink_set;
 	int n = 0;
 	int i;
+	
+	// if we're already controlling the leds,
+	// OR - if we're locked out and don't want leds on, then quit now.
+	if (flg_stop_incoming_leds || (pu_checkBlackout() && sttg_pu_blockleds))
+		return count;
 	
 	pr_info("[LED/led_blink_store]\n");
 
