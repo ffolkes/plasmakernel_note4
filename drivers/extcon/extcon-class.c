@@ -412,7 +412,7 @@ EXPORT_SYMBOL_GPL(extcon_set_cable_state_);
 int extcon_set_cable_state(struct extcon_dev *edev,
 			const char *cable_name, bool cable_state)
 {
-	// boost on insert/remove. mode/max/mid/allcores/input/gpumid/gpumax/user
+	// boost on insert/remove. mode/max/mid/allcores/input/gpumax/gpumid/user
 	zzmoove_boost(2, 5, 5, 0, 50, 10, 30, 10);
 	
 	if (cable_state)
