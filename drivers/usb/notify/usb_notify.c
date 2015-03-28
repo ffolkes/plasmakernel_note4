@@ -25,6 +25,7 @@
 #define DEFAULT_OVC_POLL_SEC 3
 
 extern unsigned int sttg_pu_cablemode;
+extern bool pu_checkLockout(void);
 
 struct  ovc {
 	wait_queue_head_t	 delay_wait;
@@ -714,8 +715,8 @@ void send_otg_notify(struct otg_notify *n,
 		return;
 	}
 
-	if (sttg_pu_cablemode == 1 && enable)
-		enable = 0;
+	if (pu_checkLockout() && sttg_pu_cablemode == 1 && enable)
+		return;
 
 	pr_info("%s event=%s(%lu) enable=%d\n", __func__,
 			event_string(event), event, enable);
