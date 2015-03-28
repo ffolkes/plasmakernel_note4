@@ -40,6 +40,11 @@
 #define DET_CHECK_TIME_MS_WITH_FSA 50		/* 50ms */
 #define WAKE_LOCK_TIME		(HZ * 5)	/* 5 sec */
 
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
+
 struct sec_jack_info {
 	struct platform_device *client;
 	struct sec_jack_platform_data *pdata;
@@ -431,6 +436,9 @@ void sec_jack_detect_work(struct work_struct *work)
 		usleep_range(10000, 10000);
 		time_left_ms -= 10;
 	}
+	
+	// boost on insert. mode/max/mid/allcores/input/gpumax/gpumid/user
+	zzmoove_boost(0, 10, 0, 10, 50, 10, 30, 50);
 
 	/* jack presence was detected the whole time, figure out which type */
 	determine_jack_type(hi);
