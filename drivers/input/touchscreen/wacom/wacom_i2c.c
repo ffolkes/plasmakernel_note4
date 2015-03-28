@@ -24,12 +24,17 @@ extern bool sttg_epen_worryfree;
 extern unsigned int sttg_epen_fixedpressure;
 extern unsigned int sttg_epen_fixedminpressure;
 extern unsigned int sttg_epen_minpressure;
+extern unsigned int sttg_epen_vib_duration;
+extern unsigned int sttg_epen_vib_strength;
+extern bool sttg_epen_vib_on_move;
+extern bool sttg_epen_vib_on_exit;
 extern bool flg_pu_locktsp;
 extern bool flg_epen_tsp_block;
 extern void zzmoove_boost(int screen_state,
 						  int max_cycles, int mid_cycles, int allcores_cycles,
 						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
 						  int userspace_cycles);
+extern void controlVibrator(unsigned int duration, unsigned int strength);
 
 int wacom_i2c_send(struct wacom_i2c *wac_i2c,
 			  const char *buf, int count, bool mode)
@@ -581,6 +586,22 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		if (softkey) {
 			pressed = !!(data[5] & 0x40);
 			keycode = (data[5] & 0x30) >> 4;
+			x = ((u16) data[1] << 8) + (u16) data[2];
+			y = ((u16) data[3] << 8) + (u16) data[4];
+			
+			if (wac_i2c->wac_dt_data->x_invert)
+				x = wac_i2c->wac_query_data->x_max - x;
+			if (wac_i2c->wac_dt_data->y_invert)
+				y = wac_i2c->wac_query_data->y_max - y;
+			
+			if (wac_i2c->wac_dt_data->xy_switch) {
+				tmp = x;
+				x = y;
+				y = tmp;
+			}
+			
+			pr_info("[wacom] x: %d, y: %d. pressed: %d, keycode: %d\n", x, y, pressed, keycode);
+			
 #ifdef USE_WACOM_BLOCK_KEYEVENT
 			if (wac_i2c->touch_pressed) {
 				if (pressed) {
@@ -653,10 +674,14 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			x = y;
 			y = tmp;
 		}
+		
+		if (sttg_epen_worryfree)
+			flg_epen_tsp_block = true;
+		
+		//pr_info("[wacom] x: %d, y: %d, pressure: %d, gain: %d, prox: %d, stylus: %d, rubber: %d, rdy: %d\n",
+		//		x, y, pressure, gain, prox, stylus, rubber, rdy);
 
 		if (!flg_pu_locktsp
-			&& (!sttg_epen_minpressure
-				|| (pressure > sttg_epen_minpressure || !prox))
 			&& wacom_i2c_coord_range(wac_i2c, &x, &y)) {
 			
 			input_report_abs(wac_i2c->input_dev, ABS_X, x);
@@ -685,9 +710,19 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 				ABS_TILT_Y, tilt_y);
 #endif
 
-			input_report_key(wac_i2c->input_dev,
-					 BTN_STYLUS, stylus);
-			input_report_key(wac_i2c->input_dev, BTN_TOUCH, prox);
+			input_report_key(wac_i2c->input_dev, BTN_STYLUS, stylus);
+			
+			if (sttg_epen_minpressure
+				&& pressure < sttg_epen_minpressure) {
+				// we are below the threshold, so always release the touch.
+				input_report_key(wac_i2c->input_dev, BTN_TOUCH, 0);
+				//prox = 0;  // don't use this so vibration will bypass minpressure
+			} else {
+				input_report_key(wac_i2c->input_dev, BTN_TOUCH, prox);
+				if (sttg_epen_vib_on_move && sttg_epen_vib_duration)
+					controlVibrator(sttg_epen_vib_duration, sttg_epen_vib_strength);
+			}
+			
 			input_report_key(wac_i2c->input_dev, wac_i2c->tool, 1);
 			input_sync(wac_i2c->input_dev);
 			wac_i2c->last_x = x;
@@ -697,6 +732,8 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 #ifdef USE_WACOM_BLOCK_KEYEVENT
 				wac_i2c->touch_pressed = true;
 #endif
+				if (sttg_epen_vib_duration)
+					controlVibrator(sttg_epen_vib_duration, sttg_epen_vib_strength);
 
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 				dev_info(&wac_i2c->client->dev,
@@ -712,6 +749,9 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 				schedule_delayed_work(&wac_i2c->touch_pressed_work,
 					msecs_to_jiffies(wac_i2c->key_delay_time));
 #endif
+				if (sttg_epen_vib_on_exit && sttg_epen_vib_duration)
+					controlVibrator(sttg_epen_vib_duration, sttg_epen_vib_strength);
+				
 				dev_info(&wac_i2c->client->dev,
 						"%s: released\n",
 						__func__);
@@ -755,6 +795,13 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			dev_info(&wac_i2c->client->dev,
 					"%s: is out\n",
 					__func__);
+			
+			//pr_info("[wacom] out - last x: %d, last y: %d\n", wac_i2c->last_x, wac_i2c->last_y);
+			
+			// if the side-button is down when hovering stops, that means we should
+			// temporarily disable worryfree.
+			if (wac_i2c->side_pressed)
+				flg_epen_tsp_block = false;
 		}
 		wac_i2c->pen_prox = 0;
 		wac_i2c->pen_pressed = 0;
@@ -835,9 +882,9 @@ static void pen_insert_work(struct work_struct *work)
 		return;
 	wac_i2c->pen_insert = !gpio_get_value(wac_i2c->gpio_pen_insert);
 	
-	// boost on remove. mode/max/mid/allcores/input/gpumid/gpumax/user
+	// boost on remove. mode/max/mid/allcores/input/gpumax/gpumid/user
 	if (!wac_i2c->pen_insert) {
-		zzmoove_boost(0, 5, 20, 5, 50, 50, 0, 20);
+		zzmoove_boost(0, 5, 0, 5, 50, 50, 0, 50);
 		
 		if (sttg_epen_worryfree)
 			flg_epen_tsp_block = true;
@@ -846,7 +893,7 @@ static void pen_insert_work(struct work_struct *work)
 		flg_epen_tsp_block = false;
 
 	dev_info(&wac_i2c->client->dev, "%s: pen %s\n",
-		__func__, wac_i2c->pen_insert ? "instert" : "remove");
+		__func__, wac_i2c->pen_insert ? "insert" : "remove");
 
 	input_report_switch(wac_i2c->input_dev,
 		SW_PEN_INSERT, !wac_i2c->pen_insert);
