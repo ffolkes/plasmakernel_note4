@@ -116,14 +116,14 @@ static int max_timeout = 10000;
 
 static int vibrator_value = -1;
 static int vibrator_work;
+static int vibrator_strength = 0;
 
 #define TEST_MODE_TIME 10000
 
 struct vibrator_platform_data vibrator_drvdata;
 
-static int set_vibetonz(int timeout)
+static int set_vibetonz(int timeout, int8_t strength)
 {
-	int8_t strength;
 	if (!timeout) {
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
 			strength = 0;
@@ -134,7 +134,8 @@ static int set_vibetonz(int timeout)
 	} else {
 		DbgOut((KERN_INFO "tspdrv: ENABLE\n"));
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
-			strength = 126;
+			if (!strength)
+				strength = 126;
 			/* 90% duty cycle */
 			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, &strength);
 		} else { /* HAPTIC_MOTOR */
@@ -149,7 +150,8 @@ static int set_vibetonz(int timeout)
 
 static void _set_vibetonz_work(struct work_struct *unused)
 {
-	set_vibetonz(vibrator_work);
+	set_vibetonz(vibrator_work, vibrator_strength);
+	vibrator_strength = 0;
 	return;
 }
 
@@ -178,6 +180,26 @@ static int get_time_for_vibetonz(struct timed_output_dev *dev)
 
 	return remaining;
 
+}
+
+void controlVibrator(unsigned int duration, unsigned int strength)
+{
+	printk(KERN_DEBUG "[tspdrv/controlVibrator] on: %d ms, strength: %d\n", duration, strength);
+	hrtimer_cancel(&timer);
+	
+	vibrator_work = duration;
+	vibrator_strength = strength;
+	schedule_work(&vibetonz_work);
+	
+	if (duration > 0) {
+		if (duration > max_timeout)
+			duration = max_timeout;
+		
+		hrtimer_start(&timer,
+					  ktime_set(duration / 1000, (duration % 1000) * 1000000),
+					  HRTIMER_MODE_REL);
+		vibrator_value = 0;
+	}
 }
 
 static void enable_vibetonz_from_user(struct timed_output_dev *dev, int value)
