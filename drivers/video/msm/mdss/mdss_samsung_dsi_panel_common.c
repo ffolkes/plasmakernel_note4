@@ -179,8 +179,7 @@ static struct dsi_cmd panel_osc_type_read_cmds;
 extern int te_set_done;
 #endif
 
-//extern int s2w_switch;
-//extern bool flg_tsp_always_on;
+extern bool flg_tsp_always_on;
 
 static struct mipi_samsung_driver_data msd;
 /*List of supported Panels with HW revision detail
@@ -563,9 +562,8 @@ void mdss_dsi_samsung_panel_reset(struct mdss_panel_data *pdata, int enable)
 		wmb();
 
 	} else {
-		//if (!s2w_switch && !flg_tsp_always_on)
+		if (!flg_tsp_always_on)
 			gpio_set_value((ctrl_pdata->rst_gpio), 0);
-
 	}
 }
 
@@ -3653,6 +3651,8 @@ mdss_samsung_parse_panel_table(np, &smart_vint_map_table,
 static void mipi_samsung_disp_early_suspend(struct early_suspend *h)
 {
 	msd.mfd->resume_state = MIPI_SUSPEND_STATE;
+	
+	pr_info("mdss mipi suspend ------------\n");
 
 	LCD_DEBUG("------");
 }
@@ -3661,6 +3661,8 @@ static void mipi_samsung_disp_late_resume(struct early_suspend *h)
 {
 
 	msd.mfd->resume_state = MIPI_RESUME_STATE;
+	
+	pr_info("mdss mipi resume ------------\n");
 
 	LCD_DEBUG("------");
 }
