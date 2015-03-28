@@ -126,6 +126,8 @@ static int fts_stop_device(struct fts_ts_info *info);
 static int fts_start_device(struct fts_ts_info *info);
 static int fts_irq_enable(struct fts_ts_info *info, bool enable);
 
+static void fts_release_all_finger(struct fts_ts_info *info);
+
 static ssize_t enable_hover_store(struct device *dev,
 								  struct device_attribute *attr, const char *buf, size_t size);
 
