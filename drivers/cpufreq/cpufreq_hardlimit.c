@@ -25,6 +25,8 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 
+#define CPUFREQ_HARDLIMIT_DEBUG
+
 unsigned int hardlimit_max_screen_on  = CPUFREQ_HARDLIMIT_MAX_SCREEN_ON_STOCK;  /* default to stock behaviour */
 unsigned int hardlimit_max_screen_off = CPUFREQ_HARDLIMIT_MAX_SCREEN_OFF_STOCK; /* default to stock behaviour */
 unsigned int hardlimit_min_screen_on  = CPUFREQ_HARDLIMIT_MIN_SCREEN_ON_STOCK;  /* default to stock behaviour */
@@ -39,6 +41,7 @@ unsigned int current_limit_min        = CPUFREQ_HARDLIMIT_MIN_SCREEN_ON_STOCK;
 unsigned int current_screen_state     = CPUFREQ_HARDLIMIT_SCREEN_ON;            /* default to screen on */
 unsigned int userspace_dvfs_lock      = CPUFREQ_HARDLIMIT_USERSPACE_DVFS_ALLOW;	/* default allows userspace dvfs interaction */
 unsigned int hardlimit_user_enforced   = HARDLIMIT_USER_DISABLED;
+bool hardlimit_bypass = false;
 
 struct delayed_work stop_wakeup_kick_work;
 
@@ -47,15 +50,18 @@ struct delayed_work stop_wakeup_kick_work;
 /* Sanitize cpufreq to hardlimits */
 unsigned int check_cpufreq_hardlimit(unsigned int freq)
 {
+	if (hardlimit_bypass)
+		return freq;
+	
 // Called way too often, even when debugging
-//	#ifdef CPUFREQ_HARDLIMIT_DEBUG
-//	pr_info("[HARDLIMIT] check_cpufreq_hardlimit : min = %u / max = %u / freq = %u / result = %u \n",
-//			current_limit_min,
-//			current_limit_max,
-//			freq,
-//			max(current_limit_min, min(current_limit_max, freq))
-//		);
-//	#endif
+	#ifdef CPUFREQ_HARDLIMIT_DEBUG
+	pr_info("[HARDLIMIT] check_cpufreq_hardlimit : min = %u / max = %u / freq = %u / result = %u \n",
+			current_limit_min,
+			current_limit_max,
+			freq,
+			max(current_limit_min, min(current_limit_max, freq))
+		);
+	#endif
 	return max(current_limit_min, min(current_limit_max, freq));
 }
 
@@ -108,6 +114,11 @@ unsigned int userspace_dvfs_lock_status(void)
 /* Powersuspend */
 static void cpufreq_hardlimit_suspend(struct power_suspend * h)
 {
+	current_screen_state = CPUFREQ_HARDLIMIT_SCREEN_OFF;
+	
+	if (hardlimit_bypass)
+		return;
+	
 	#ifdef CPUFREQ_HARDLIMIT_DEBUG
 	pr_info("[HARDLIMIT] suspend : old_min = %u / old_max = %u / new_min = %u / new_max = %u \n",
 			current_limit_min,
@@ -116,7 +127,6 @@ static void cpufreq_hardlimit_suspend(struct power_suspend * h)
 			hardlimit_max_screen_off
 		);
 	#endif
-	current_screen_state = CPUFREQ_HARDLIMIT_SCREEN_OFF;
 	reapply_hard_limits();
 	return;
 }
@@ -124,6 +134,9 @@ static void cpufreq_hardlimit_suspend(struct power_suspend * h)
 static void cpufreq_hardlimit_resume(struct power_suspend * h)
 {
 	current_screen_state = CPUFREQ_HARDLIMIT_SCREEN_ON;
+	
+	if (hardlimit_bypass)
+		return;
 
 	if(wakeup_kick_delay == CPUFREQ_HARDLIMIT_WAKEUP_KICK_DISABLED) {
 		#ifdef CPUFREQ_HARDLIMIT_DEBUG
@@ -472,6 +485,30 @@ static ssize_t hardlimit_user_enforced_store(struct kobject *kobj, struct kobj_a
     
 }
 
+static ssize_t hardlimit_bypass_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", hardlimit_bypass);
+}
+
+static ssize_t hardlimit_bypass_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	
+	unsigned int new_hardlimit_bypass;
+	
+	if (!sscanf(buf, "%du", &new_hardlimit_bypass))
+		return -EINVAL;
+	
+	if (new_hardlimit_bypass > 0)
+		hardlimit_bypass = true;
+	else
+		hardlimit_bypass = false;
+	
+	reapply_hard_limits();
+	
+	pr_info("[HARDLIMIT] bypass set to: %d\n", hardlimit_bypass);
+	return count;
+}
+
 /* sysfs interface for "userspace_dvfs_lock" */
 static ssize_t userspace_dvfs_lock_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
@@ -639,6 +676,9 @@ __ATTR(touchboost_hi_freq, 0666, touchboost_hi_freq_show, touchboost_hi_freq_sto
 static struct kobj_attribute hardlimit_user_enforced_attribute =
 __ATTR(hardlimit_user_enforced, 0666, hardlimit_user_enforced_show, hardlimit_user_enforced_store);
 
+static struct kobj_attribute hardlimit_bypass_attribute =
+__ATTR(hardlimit_bypass, 0666, hardlimit_bypass_show, hardlimit_bypass_store);
+
 static struct kobj_attribute userspace_dvfs_lock_attribute =
 __ATTR(userspace_dvfs_lock, 0666, userspace_dvfs_lock_show, userspace_dvfs_lock_store);
 
@@ -664,6 +704,7 @@ static struct attribute *hardlimit_attrs[] = {
 	&touchboost_lo_freq_attribute.attr,
 	&touchboost_hi_freq_attribute.attr,
     &hardlimit_user_enforced_attribute.attr,
+	&hardlimit_bypass_attribute.attr,
 	&userspace_dvfs_lock_attribute.attr,
 	&available_frequencies_attribute.attr,
 	&current_limit_min_attribute.attr,

@@ -17,6 +17,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define CPUFREQ_HARDLIMIT_DEBUG
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
@@ -30,6 +31,10 @@
 #include <linux/syscore_ops.h>
 #include <linux/tick.h>
 #include <trace/events/power.h>
+
+extern unsigned int current_limit_min;
+extern unsigned int current_limit_max;
+extern bool hardlimit_bypass;
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
@@ -338,6 +343,7 @@ extern void update_scaling_limits(unsigned int freq_min, unsigned int freq_max)
 	struct cpufreq_policy *policy, new_policy;
 
 	for_each_possible_cpu(cpu) {
+		cpufreq_update_policy(cpu);
         if (hardlimit_user_enforced_status() == HARDLIMIT_USER_DISABLED) {
             return;
         }
@@ -985,7 +991,10 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy, struct device *de
 	if (per_cpu(cpufreq_policy_save, cpu).min) {
 #ifdef CONFIG_CPUFREQ_HARDLIMIT
         /* Yank555.lu - Enforce hardlimit when restoring policy */
-        policy->min = check_cpufreq_hardlimit(per_cpu(cpufreq_policy_save, cpu).min);
+		if (!hardlimit_bypass)
+			policy->min = check_cpufreq_hardlimit(per_cpu(cpufreq_policy_save, cpu).min);
+		else
+			policy->min = per_cpu(cpufreq_policy_save, cpu).min;
 #else
 		policy->min = per_cpu(cpufreq_policy_save, cpu).min;
 #endif
@@ -994,7 +1003,10 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy, struct device *de
 	if (per_cpu(cpufreq_policy_save, cpu).max) {
 #ifdef CONFIG_CPUFREQ_HARDLIMIT
         /* Yank555.lu - Enforce hardlimit when restoring policy */
-        policy->max = check_cpufreq_hardlimit(per_cpu(cpufreq_policy_save, cpu).max);
+		if (!hardlimit_bypass)
+			policy->max = check_cpufreq_hardlimit(per_cpu(cpufreq_policy_save, cpu).max);
+		else
+			policy->max = per_cpu(cpufreq_policy_save, cpu).max;
 #else
 		policy->max = per_cpu(cpufreq_policy_save, cpu).max;
 #endif
@@ -2394,18 +2406,25 @@ int cpufreq_update_policy(unsigned int cpu)
 	memcpy(&new_policy, policy, sizeof(*policy));
 #ifdef CONFIG_CPUFREQ_HARDLIMIT
 	#ifdef CPUFREQ_HARDLIMIT_DEBUG
-	pr_info("[HARDLIMIT] cpufreq.c update_policy : old_min = %u / old_max = %u / tried_min = %u / tried_max = %u / new_min = %u / new_max = %u \n",
+	pr_info("[cpufreq/update_policy/hardlimit] old_min = %u / old_max = %u / tried_min = %u / tried_max = %u / new_min = %u / new_max = %u (cur_limit_min: %u, cur_limit_max: %u)\n",
 			new_policy.min,
 			new_policy.max,
 			policy->user_policy.min,
 			policy->user_policy.max,
 			check_cpufreq_hardlimit(policy->user_policy.min),
-			check_cpufreq_hardlimit(policy->user_policy.max)
+			check_cpufreq_hardlimit(policy->user_policy.max),
+			current_limit_min,
+			current_limit_max
 		);
 	#endif
     /* Yank555.lu - Enforce hardlimit */
-    new_policy.min = check_cpufreq_hardlimit(policy->user_policy.min);
-    new_policy.max = check_cpufreq_hardlimit(policy->user_policy.max);
+	if (!hardlimit_bypass) {
+		new_policy.min = check_cpufreq_hardlimit(policy->user_policy.min);
+		new_policy.max = check_cpufreq_hardlimit(policy->user_policy.max);
+	} else {
+		new_policy.min = policy->user_policy.min;
+		new_policy.max = policy->user_policy.max;
+	}
 #else
     new_policy.min = policy->user_policy.min;
     new_policy.max = policy->user_policy.max;
