@@ -29,6 +29,10 @@ extern bool sttg_pu_allow_tks;
 extern bool sttg_pu_allow_mediamode;
 extern bool pu_checkLockout(void);
 extern int touch_x_start;
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
 
 struct qpnp_pin_cfg cypress_int_set[] = {
 	{
@@ -95,6 +99,7 @@ extern unsigned int sttg_tkf_precheck_timeout;
 extern unsigned int sttg_tkf_key1_key_code;
 extern unsigned int sttg_tkf_key2_key_code;
 extern bool flg_tkf_tsp;
+extern bool flg_tkf_tsp_waiting;
 
 // tk slide.
 extern bool sttg_tks_mode;
@@ -834,12 +839,21 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 	
+	if (flg_power_suspended && !plasma_media_active) {
+		// if the screen is off and no media is playing,
+		// tk's should be ignored.
+		return IRQ_HANDLED;
+	}
+	
 	// start the tsp block (doesn't affect tkf).
 	tk_refreshTSPblock();
 	
 	tk_key_keycode = tk_applyCustomkeycode(code, info->keycode[code]);
 	
-	if (touch_x_start < 1
+	if (
+		(touch_x_start < 1  // don't allow tkf if the tsp is already being touched
+		 || (!press && code == tkf_active_code && tkf_active_key_state)  // but allow tkf release
+		)
 		&& (
 			(sttg_tkf_mode
 			 && (
@@ -983,6 +997,9 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 			} else {
 				// this is the first press.
 				
+				// boost on inital press. mode/max/mid/allcores/input/gpumax/gpumid/user
+				zzmoove_boost(1, 0, 10, 0, 50, 5, 30, 0);
+				
 				pr_info(LOGTAG"/cypress_touchkey_interrupt/tkf] scheduling work in %d ms to press %d\n",
 						tmp_sttg_tkf_precheck_timeout, tk_key_keycode);
 				
@@ -991,6 +1008,7 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 				tkf_active_keycode = tk_key_keycode;
 				tkf_active_key_state = 1;
 				flg_tkf_tsp = false;
+				flg_tkf_tsp_waiting = false;
 				
 				// schedule work to process the input event, but first cancel any pending work.
 				cancel_delayed_work_sync(&work_tkf_press_down);
@@ -1003,20 +1021,31 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		} else if (!press && code == tkf_active_code && tkf_active_key_state) {
 			// finger-up for same key.
 			
+			// this is wrong, remove it.
+			/*// it may be possible for this finger up to happen just as the tsp was touched,
+			// which would then leave the tsp side of tkf still half active. so reset it here.
+			flg_tkf_tsp_waiting = false;*/
+			
 			pr_info(LOGTAG"/cypress_touchkey_interrupt/tkf] tk up, timesince: %d ms\n",
 					time_since_tkf_lastpress);
+			
+			tkf_active_key_state = 0;
 			
 			if (time_since_tkf_lastpress < tmp_sttg_tkf_precheck_timeout) {
 				// this is a normal finger-up, save it and let the scheduled work do it.
 				
-				tkf_active_key_state = 0;
+				// NOTE:
+				// we may need to tell android, because if the up comes just as the scheduled work
+				// is being done to do a deferred press, it is possible the work will complete before the up is
+				// acknowledged. so if we snub it here, it might never get sent. but let's hope it works the
+				// way it is.
 				
 				// don't tell android.
 				return IRQ_HANDLED;
 				
 			} else {
 				// if it has been longer than sttg_tkf_precheck_timeout since it went down, the work should have
-				// completed and pressed 1 by now. so we will let this finger-up complete the press.
+				// completed and pressed 1 by now. so we will let this finger-up complete the press normally.
 			}
 		}
 	}
