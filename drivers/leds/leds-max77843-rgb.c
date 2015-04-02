@@ -89,7 +89,7 @@ extern bool sttg_pu_blockleds;
 
 static bool sttg_fled_fade = 0;
 static unsigned int sttg_fled_powermode = 0;
-static unsigned int sttg_fled_high_r_gain = 200;
+static unsigned int sttg_fled_high_r_gain = 215;
 static unsigned int sttg_fled_high_g_gain = 210;
 static unsigned int sttg_fled_high_b_gain = 80;
 static unsigned int sttg_fled_low_r_gain = 15;
