@@ -41,7 +41,7 @@ unsigned int current_limit_min        = CPUFREQ_HARDLIMIT_MIN_SCREEN_ON_STOCK;
 unsigned int current_screen_state     = CPUFREQ_HARDLIMIT_SCREEN_ON;            /* default to screen on */
 unsigned int userspace_dvfs_lock      = CPUFREQ_HARDLIMIT_USERSPACE_DVFS_ALLOW;	/* default allows userspace dvfs interaction */
 unsigned int hardlimit_user_enforced   = HARDLIMIT_USER_DISABLED;
-bool hardlimit_bypass = false;
+bool hardlimit_bypass = true;
 
 struct delayed_work stop_wakeup_kick_work;
 
