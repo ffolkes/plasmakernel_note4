@@ -309,8 +309,10 @@ static unsigned int plasma_lpm_override(void)
 		// if flag is set or we're on our ~first suspend, then stay on.
 		// we do this in anticipation of synapse turning something on
 		// after the screen times out that would have required flg_tsp_always_on.
+		pr_info("[tsp/plasma_lpm_override] lpm on\n");
 		return 1;
 	} else {
+		pr_info("[tsp/plasma_lpm_override] lpm off\n");
 		return 0;
 	}
 }
