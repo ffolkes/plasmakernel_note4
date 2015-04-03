@@ -39,6 +39,7 @@
 extern bool flg_power_suspended;
 extern int do_timesince(struct timeval time_start);
 extern unsigned int pu_recording_end(void);
+extern int plasma_process_gpio_button_state(int keycode, int state);
 /*extern void zzmoove_boost(int screen_state,
 						  int max_cycles, int mid_cycles, int allcores_cycles,
 						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
@@ -58,6 +59,7 @@ struct timeval time_pressed_homekey;
 struct timeval time_pressed_home;
 static bool flg_skip_next = false;
 static int ctr_homepress = 0;
+struct input_dev *plasma_input_dev_gpio;
 
 #if defined(CONFIG_SENSORS_HALL)
 static bool flip_cover;
@@ -376,6 +378,13 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	 */
 	static int home_old_state;
 	
+	if (!plasma_process_gpio_button_state(button->code, state)) {
+		printk(KERN_DEBUG"[KEYS/plasma] BLOCKED - keycode: %d, state: %d\n", button->code, state);
+		home_old_state = state;  // keep this up-to-date.
+		flg_skip_next = false;  // reset this, just in case it was active.
+		return;
+	}
+	
 	if (flg_skip_next) {
 		// avoid sending the key-up event.
 		flg_skip_next = false;
@@ -677,6 +686,8 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 	 */
 	if (!button->can_disable)
 		irqflags |= IRQF_SHARED;
+	
+	irqflags |= IRQF_NO_SUSPEND;
 
 	error = request_any_context_irq(bdata->irq, isr, irqflags, desc, bdata);
 	if (error < 0) {
@@ -1050,10 +1061,10 @@ static ssize_t wakeup_enable(struct device *dev,
 	for (i = 0; i < ddata->pdata->nbuttons; i++) {
 		struct gpio_button_data *button = &ddata->data[i];
 		if (button->button->type == EV_KEY) {
-			if (test_bit(button->button->code, bits))
+			//if (test_bit(button->button->code, bits))
 				button->button->wakeup = 1;
-			else
-				button->button->wakeup = 0;
+			//else
+			//	button->button->wakeup = 0;
 			pr_info("%s wakeup status %d\n", button->button->desc,\
 					button->button->wakeup);
 		}
@@ -1130,7 +1141,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 		if (error)
 			goto fail2;
 
-		if (button->wakeup)
+		//if (button->wakeup)
 			wakeup = 1;
 	}
 
@@ -1161,6 +1172,8 @@ static int gpio_keys_probe(struct platform_device *pdev)
 			error);
 		goto fail3;
 	}
+	
+	plasma_input_dev_gpio = input;
 
 	ret = device_create_file(sec_key, &dev_attr_sec_key_pressed);
 	if (ret) {

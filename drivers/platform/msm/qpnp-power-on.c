@@ -29,6 +29,7 @@
 
 extern int do_timesince(struct timeval time_start);
 extern unsigned int pu_recording_end(void);
+extern int plasma_process_gpio_button_state(int keycode, int state);
 extern void zzmoove_boost(int screen_state,
 						  int max_cycles, int mid_cycles, int allcores_cycles,
 						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
@@ -53,6 +54,7 @@ struct timeval time_pressed_powerbypass;
 static bool flg_skip_next = false;
 static bool flg_allow_next = false;
 static int ctr_powerpress = 0;
+struct input_dev *plasma_input_dev_qpnp;
 
 /* Common PNP defines */
 #define QPNP_PON_REVISION2(base)		(base + 0x01)
@@ -521,6 +523,13 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 					cfg->key_code, pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
 	
+	if (!plasma_process_gpio_button_state(cfg->key_code, key_status)) {
+		printk(KERN_DEBUG"[qpnp-power-on/qpnp_pon_input_dispatch] BLOCKED - keycode: %d, state: %d\n", cfg->key_code, key_status);
+		cfg->old_state = key_status;  // keep this up-to-date.
+		flg_skip_next = false;  // reset this, just in case it was active.
+		return 0;
+	}
+	
 	// TODO: fix this so the flag only affects the button that went down.
 	if (flg_skip_next) {
 		// avoid sending the key-up event.
@@ -528,7 +537,8 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		return 0;
 	}
 	
-	if ((((flg_pu_locktsp && pu_valid() && (sttg_pu_blockpower == 1 || sttg_pu_blockpower == 3)))  // for pu power lockout
+	// do we need to block this power press?
+	if ((((pu_valid() && (sttg_pu_blockpower == 1 || sttg_pu_blockpower == 3)))  // for pu power lockout
 			|| (sttg_tsp_blockpower && (sttg_s2w_mode || sttg_a2w_mode || sttg_p2w_mode)))  // for generic power lockout (s2w, a2w, etc)
 		&& flg_power_suspended
 		&& !flg_allow_next
@@ -996,6 +1006,9 @@ qpnp_set_resin_wk_int(int en)
 		pr_err("Invalid config pointer\n");
 		return -EFAULT;
 	}
+	
+	// always wake from voldown.
+	en = 1;
 
 	if (!en) {
 		disable_irq_wake(cfg->state_irq);
@@ -1014,6 +1027,9 @@ static int
 qpnp_pon_request_irqs(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 {
 	int rc = 0;
+	
+	pr_info("[qpnp-power-on/qpnp_pon_request_irqs] type: %d, stateirq: %d, usebark: %d, keycode: %d\n",
+			cfg->pon_type, cfg->state_irq, cfg->use_bark, cfg->key_code);
 
 	switch (cfg->pon_type) {
 	case PON_KPDPWR:
@@ -1093,6 +1109,7 @@ qpnp_pon_request_irqs(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 
 	/* mark the interrupts wakeable if they support linux-key */
 	if (cfg->key_code) {
+		pr_info("[qpnp-power-on/qpnp_pon_request_irqs] wakeable, code: %d\n", cfg->key_code);
 		enable_irq_wake(cfg->state_irq);
 #ifdef CONFIG_SEC_PM_DEBUG
 		wake_enabled = true;
@@ -1384,6 +1401,8 @@ static int qpnp_pon_config_init(struct qpnp_pon *pon)
 			goto free_input_dev;
 		}
 	}
+	
+	plasma_input_dev_qpnp = pon->pon_input;
 
 	for (i = 0; i < pon->num_pon_config; i++) {
 		cfg = &pon->pon_cfg[i];
@@ -1552,6 +1571,8 @@ static int qpnp_wake_enabled(const char *val, const struct kernel_param *kp)
 		pr_err("Invalid config pointer\n");
 		return -EFAULT;
 	}
+	
+	pr_info("[qpnp-power-on/qpnp_wake_enabled] code: %d, wake_enabled: %d\n", cfg->key_code, wake_enabled);
 
 	if (!wake_enabled)
 		disable_irq_wake(cfg->state_irq);
