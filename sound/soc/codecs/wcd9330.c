@@ -7427,10 +7427,15 @@ EXPORT_SYMBOL(is_codec_probe_done);
 #endif
 
 #ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
+#ifndef CONFIG_SND_SOC_WCD9320
 struct snd_soc_codec *fauxsound_codec_ptr;
 EXPORT_SYMBOL(fauxsound_codec_ptr);
 int wcd9xxx_hw_revision;
 EXPORT_SYMBOL(wcd9xxx_hw_revision);
+#else
+extern struct snd_soc_codec *fauxsound_codec_ptr;
+extern int wcd9xxx_hw_revision;
+#endif
 #endif
 
 static int tomtom_codec_probe(struct snd_soc_codec *codec)
