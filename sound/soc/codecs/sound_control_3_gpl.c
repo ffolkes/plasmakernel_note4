@@ -266,9 +266,21 @@ static ssize_t speaker_gain_show(struct kobject *kobj,
 static ssize_t speaker_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	unsigned int lval, rval, chksum;
+	int lval, rval, chksum;
 
-	sscanf(buf, "%u %u %u", &lval, &rval, &chksum);
+	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
+	
+	if (lval > 20)
+		lval = 20;
+	
+	if (rval > 20)
+		rval = 20;
+	
+	if (lval < 0)
+		lval = 0;
+	
+	if (rval < 0)
+		rval = 0;
 
 	if (calc_checksum(lval, rval, chksum)) {
 		tomtom_write(fauxsound_codec_ptr,
@@ -292,9 +304,21 @@ static ssize_t headphone_gain_show(struct kobject *kobj,
 static ssize_t headphone_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	unsigned int lval, rval, chksum;
+	int lval, rval, chksum;
 
-	sscanf(buf, "%u %u %u", &lval, &rval, &chksum);
+	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
+	
+	if (lval > 20)
+		lval = 20;
+	
+	if (rval > 20)
+		rval = 20;
+	
+	if (lval < 0)
+		lval = 0;
+	
+	if (rval < 0)
+		rval = 0;
 
 	if (calc_checksum(lval, rval, chksum)) {
 		tomtom_write(fauxsound_codec_ptr,
@@ -316,11 +340,23 @@ static ssize_t headphone_pa_gain_show(struct kobject *kobj,
 static ssize_t headphone_pa_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	unsigned int lval, rval, chksum;
+	int lval, rval, chksum;
 	unsigned int gain, status;
 	unsigned int out;
 
-	sscanf(buf, "%u %u %u", &lval, &rval, &chksum);
+	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
+	
+	if (lval > 20)
+		lval = 20;
+	
+	if (rval > 20)
+		rval = 20;
+	
+	if (lval < 0)
+		lval = 0;
+	
+	if (rval < 0)
+		rval = 0;
 
 	if (calc_checksum(lval, rval, chksum)) {
 	gain = tomtom_read(fauxsound_codec_ptr, TOMTOM_A_RX_HPH_L_GAIN);
