@@ -48,7 +48,7 @@ static int quickwakeup_check(void)
 		int ret = index->qw_check(index->data);
 		index->execute = ret;
 		check |= ret;
-		pr_debug("%s: %s votes for %s\n", __func__, index->name,
+		pr_info("%s: %s votes for %s\n", __func__, index->name,
 			ret ? "execute" : "dont care");
 	}
 
@@ -74,14 +74,14 @@ static int quickwakeup_execute(void)
 			index->execute = 0;
 			final_vote &= ret;
 			suspend_again = final_vote;
-			pr_debug("%s: %s votes for %s\n", __func__, index->name,
+			pr_info("%s: %s votes for %s\n", __func__, index->name,
 				ret ? "suspend again" : "wakeup");
 		}
 	}
 
 	mutex_unlock(&list_lock);
 
-	pr_debug("%s: %s\n", __func__,
+	pr_info("%s: %s\n", __func__,
 		suspend_again ? "suspend again" : "wakeup");
 
 	return suspend_again;
@@ -97,7 +97,7 @@ bool quickwakeup_suspend_again(void)
 	if (quickwakeup_check())
 		ret = quickwakeup_execute();
 
-	pr_debug("%s- returning %d %s\n", __func__, ret,
+	pr_info("%s- returning %d %s\n", __func__, ret,
 		ret ? "suspend again" : "wakeup");
 
 	return ret;
