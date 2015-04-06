@@ -107,8 +107,7 @@ static struct kobject *dyn_fsync_kobj;
 extern void sync_filesystems(int wait);
 static void dyn_fsync_force_flush(void)
 {
-	sync_filesystems(0);
-	sync_filesystems(1);
+
 }
 
 static void dyn_fsync_suspend(struct power_suspend *p)
