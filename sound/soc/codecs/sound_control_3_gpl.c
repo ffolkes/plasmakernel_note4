@@ -270,12 +270,6 @@ static ssize_t speaker_gain_store(struct kobject *kobj,
 
 	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
 	
-	if (lval > 20)
-		lval = 20;
-	
-	if (rval > 20)
-		rval = 20;
-	
 	if (lval < 0)
 		lval = 0;
 	
@@ -308,12 +302,6 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
 
 	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
 	
-	if (lval > 20)
-		lval = 20;
-	
-	if (rval > 20)
-		rval = 20;
-	
 	if (lval < 0)
 		lval = 0;
 	
@@ -345,12 +333,6 @@ static ssize_t headphone_pa_gain_store(struct kobject *kobj,
 	unsigned int out;
 
 	sscanf(buf, "%i %i %i", &lval, &rval, &chksum);
-	
-	if (lval > 20)
-		lval = 20;
-	
-	if (rval > 20)
-		rval = 20;
 	
 	if (lval < 0)
 		lval = 0;
