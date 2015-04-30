@@ -40,10 +40,10 @@ extern bool flg_power_suspended;
 extern int do_timesince(struct timeval time_start);
 extern unsigned int pu_recording_end(void);
 extern int plasma_process_gpio_button_state(int keycode, int state);
-/*extern void zzmoove_boost(int screen_state,
+extern void zzmoove_boost(int screen_state,
 						  int max_cycles, int mid_cycles, int allcores_cycles,
 						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
-						  int userspace_cycles);*/
+						  int userspace_cycles);
 
 extern bool sttg_pu_tamperevident;
 extern bool sttg_pu_warnled;
@@ -60,6 +60,9 @@ struct timeval time_pressed_home;
 static bool flg_skip_next = false;
 static int ctr_homepress = 0;
 struct input_dev *plasma_input_dev_gpio;
+static struct wake_lock wake_gpio;
+static void gpio_unwakelock_work(struct work_struct * work_gpio_unwakelock);
+static DECLARE_DELAYED_WORK(work_gpio_unwakelock, gpio_unwakelock_work);
 
 #if defined(CONFIG_SENSORS_HALL)
 static bool flip_cover;
@@ -366,6 +369,12 @@ static struct attribute_group gpio_keys_attr_group = {
 
 int key_irq_state;
 
+static void gpio_unwakelock_work(struct work_struct * work_gpio_unwakelock)
+{
+	pr_info("[keys/gpio_unwakelock_work] dropping gpio wakelock\n");
+	wake_unlock(&wake_gpio);
+}
+
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -377,6 +386,18 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	 * without a press event
 	 */
 	static int home_old_state;
+	
+	if (state) {
+		// zzmoove_boost: mode/max/mid/allcores/input/gpumax/gpumid/user
+		if (flg_power_suspended) {
+			zzmoove_boost(0, 5, 10, 0, 0, 10, 0, 0);
+			wake_lock(&wake_gpio);
+			schedule_delayed_work(&work_gpio_unwakelock, msecs_to_jiffies(1000));
+		} else {
+			zzmoove_boost(0, 5, 10, 0, 50, 5, 0, 0);
+			wake_unlock(&wake_gpio);
+		}
+	}
 	
 	if (!plasma_process_gpio_button_state(button->code, state)) {
 		printk(KERN_DEBUG"[KEYS/plasma] BLOCKED - keycode: %d, state: %d\n", button->code, state);
@@ -413,13 +434,19 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 				
 				printk(KERN_DEBUG"[KEYS/pu] home tampered!\n");
 				do_gettimeofday(&time_pressed_homekey);
-				
-				input_event(input, type, KEY_HOMEPAGE, 1);
-				input_sync(input);
-				
-				input_event(input, type, KEY_HOMEPAGE, 0);
-				input_sync(input);
 			}
+			
+			// phone is in locked mode. when we get this 1, immediately send 0.
+			
+			input_event(input, type, KEY_HOMEPAGE, 1);
+			input_sync(input);
+			
+			input_event(input, type, KEY_HOMEPAGE, 0);
+			input_sync(input);
+			
+			key_irq_state = 0;
+			return;
+			
 		} else {
 			// screen is on, so block all presses.
 			return;
@@ -1195,6 +1222,8 @@ static int gpio_keys_probe(struct platform_device *pdev)
 	dev_set_drvdata(sec_key, ddata);
 
 	device_init_wakeup(&pdev->dev, wakeup);
+	
+	wake_lock_init(&wake_gpio, WAKE_LOCK_SUSPEND, "wake_plasma_gpio");
 
 	return 0;
 
