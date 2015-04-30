@@ -105,6 +105,15 @@ static int g_nmajor;
     #include "VibeOSKernelLinuxTime.c"
 #endif
 
+static int set_vibetonz(int timeout, int8_t strength);
+
+static unsigned int vib_duration = 0;
+static unsigned int vib_strength = 0;
+static void viboff_work(struct work_struct * work_viboff);
+static DECLARE_DELAYED_WORK(work_viboff, viboff_work);
+static struct workqueue_struct *wq_vib;
+static struct delayed_work work_vibon;
+
 /* timed_output */
 static void _set_vibetonz_work(struct work_struct *unused);
 
@@ -122,8 +131,21 @@ static int vibrator_strength = 0;
 
 struct vibrator_platform_data vibrator_drvdata;
 
+static void viboff_work(struct work_struct * work_viboff)
+{
+	pr_info("[tspdrv/viboff_work] vibrator off\n");
+	set_vibetonz(0, 0);
+}
+
+static void vibon_work(struct work_struct *work)
+{
+	pr_info("[tspdrv/vibon_work] vibrator on\n");
+	set_vibetonz(vib_duration, vib_strength);
+}
+
 static int set_vibetonz(int timeout, int8_t strength)
 {
+	printk(KERN_DEBUG "[tspdrv/set_vibetonz] on: %d ms, strength: %d\n", timeout, strength);
 	if (!timeout) {
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
 			strength = 0;
@@ -142,6 +164,12 @@ static int set_vibetonz(int timeout, int8_t strength)
 		DbgOut((KERN_INFO "tspdrv: ampenable\n"));
 			ImmVibeSPI_ForceOut_AmpEnable(0);
 		}
+		if (vib_duration) {
+			cancel_delayed_work_sync(&work_viboff);
+			schedule_delayed_work(&work_viboff, msecs_to_jiffies(vib_duration));
+			vib_duration = 0;
+			vib_strength = 0;
+		}
 	}
 
 	vibrator_value = timeout;
@@ -150,14 +178,21 @@ static int set_vibetonz(int timeout, int8_t strength)
 
 static void _set_vibetonz_work(struct work_struct *unused)
 {
-	set_vibetonz(vibrator_work, vibrator_strength);
-	vibrator_strength = 0;
+	//if (vib_duration) {
+	//	printk(KERN_DEBUG "[tspdrv/_set_vibetonz_work] vib_duration: %d ms, vib_strength: %d\n", vib_duration, vib_strength);
+	//	set_vibetonz(vib_duration, vib_strength);
+	//} else {
+		printk(KERN_DEBUG "[tspdrv/_set_vibetonz_work] on: %d ms, strength: %d\n", vibrator_work, vibrator_strength);
+		set_vibetonz(vibrator_work, vibrator_strength);
+		vibrator_strength = 0;
+	//}
 	return;
 }
 
 static enum hrtimer_restart vibetonz_timer_func(struct hrtimer *timer)
 {
 	/* set_vibetonz(0); */
+	printk(KERN_DEBUG "[tspdrv/hrtimer_restart] vibrator_work was: %d ms\n", vibrator_work);
 	vibrator_work = 0;
 	schedule_work(&vibetonz_work);
 
@@ -184,21 +219,23 @@ static int get_time_for_vibetonz(struct timed_output_dev *dev)
 
 void controlVibrator(unsigned int duration, unsigned int strength)
 {
-	printk(KERN_DEBUG "[tspdrv/controlVibrator] on: %d ms, strength: %d\n", duration, strength);
-	hrtimer_cancel(&timer);
+	if (vib_duration) {
+		printk(KERN_DEBUG "[tspdrv/controlVibrator] ALREADY PENDING - skipped: (on: %d ms, strength: %d)\n", duration, strength);
+	} else {
+		printk(KERN_DEBUG "[tspdrv/controlVibrator] on: %d ms, strength: %d\n", duration, strength);
+	}
 	
-	vibrator_work = duration;
-	vibrator_strength = strength;
-	schedule_work(&vibetonz_work);
+	vib_duration = duration;
+	vib_strength = strength;
 	
-	if (duration > 0) {
-		if (duration > max_timeout)
-			duration = max_timeout;
-		
-		hrtimer_start(&timer,
-					  ktime_set(duration / 1000, (duration % 1000) * 1000000),
-					  HRTIMER_MODE_REL);
-		vibrator_value = 0;
+	//hrtimer_cancel(&timer);
+	if (cancel_delayed_work_sync(&work_viboff)) {
+		// work was pending, just extend it.
+		schedule_delayed_work(&work_viboff, msecs_to_jiffies(duration));
+		printk(KERN_DEBUG "[tspdrv/controlVibrator] extended another %d ms\n", duration);
+	} else {
+		//queue_delayed_work(wq_vib, &work_viboff, 0);
+		queue_delayed_work(wq_vib, &work_vibon, 0);
 	}
 }
 
@@ -483,6 +520,12 @@ static int tspdrv_probe(struct platform_device *pdev)
 		g_samples_buffer[i].actuator_samples[1].nbuffer_size = 0;
 	}
 	wake_lock_init(&vib_wake_lock, WAKE_LOCK_SUSPEND, "vib_present");
+	
+	wq_vib = alloc_workqueue("wq_vib",
+					WQ_HIGHPRI | WQ_UNBOUND | WQ_FREEZABLE |
+					WQ_MEM_RECLAIM, 0);
+	
+	INIT_DEFERRABLE_WORK(&work_vibon, vibon_work);
 
 	vibetonz_start();
 
@@ -502,6 +545,7 @@ static int tspdrv_remove(struct platform_device *pdev)
 	ImmVibeSPI_ForceOut_Terminate();
 
 	wake_lock_destroy(&vib_wake_lock);
+	destroy_workqueue(wq_vib);
 
 	return 0;
 }
