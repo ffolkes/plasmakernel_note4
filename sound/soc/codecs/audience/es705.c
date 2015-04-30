@@ -5435,10 +5435,10 @@ irqreturn_t es705_irq_event(int irq, void *irq_data)
 			press_power();
 		}
 		
+		do_gettimeofday(&time_voice_lastirq);
+		printk(KERN_DEBUG"[es705/es705_irq_event] flg_voice_allowturnoff=true\n");
 		flg_voice_allowturnoff = true;
 	}
-	
-	do_gettimeofday(&time_voice_lastirq);
 
 	mutex_lock(&es705->cvq_mutex);
 	dev_info(es705->dev, "%s(): %s mode, Interrupt event",
