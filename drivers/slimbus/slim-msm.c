@@ -17,9 +17,11 @@
 
 /*extern struct timeval time_lasthsicirq;
 extern struct timeval time_lastsuspended;
-extern bool suspend_flag;
-extern void zzmoove_boost(unsigned int screen_state,
-						  unsigned int max_cycles, unsigned int mid_cycles, unsigned int allcores_cycles, unsigned int input_cycles);*/
+extern bool suspend_flag;*/
+extern void zzmoove_boost(int screen_state,
+						  int max_cycles, int mid_cycles, int allcores_cycles,
+						  int input_cycles, int devfreq_max_cycles, int devfreq_mid_cycles,
+						  int userspace_cycles);
 
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len)
 {
@@ -1288,6 +1290,10 @@ int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 			pr_info("msm_slim_qmi_power_request: boosting! (time since hsic irq: %d, active: %d)\n", time_since_lasthsicirq, active);
 		}
 	}*/
+	
+	// zzmoove_boost: mode/max/mid/allcores/input/gpumax/gpumid/user
+	if (active)
+		zzmoove_boost(0, 0, 10, 0, 0, 0, 0, 0);
 
 	dev_err(dev->dev, "%s: active %d\n", __func__, active);
 
