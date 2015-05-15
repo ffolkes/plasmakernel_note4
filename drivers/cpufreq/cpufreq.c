@@ -1239,6 +1239,9 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif,
 	 */
 	cpumask_and(policy->cpus, policy->cpus, cpu_online_mask);
 
+	if (policy->max > 2649600)
+		policy->max = 2649600;
+
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
@@ -2179,11 +2182,12 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_NOTIFY, new_policy);
 	
-	policy->min = new_policy->min;
-	if (policy->cpu >= 1) {
+	if (policy->cpu > 0) {
 		policy->max = cpu0_policy->max;
+		policy->min = cpu0_policy->min;
 	} else {
 		policy->max = new_policy->max;
+		policy->min = new_policy->min;
 	}
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
