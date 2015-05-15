@@ -598,7 +598,7 @@ passthrough:
 	// also boost if release event occurred without a press.
 	if (cfg->key_code == 116 && (key_status || (!cfg->old_state && !key_status))) {
 		pr_info("[qpnp-power-on/qpnp_pon_input_dispatch] boosting for powerkey!\n");
-		zzmoove_boost(2, 5, 20, 5, 80, 5, 30, 0);
+		zzmoove_boost(2, 10, 20, 20, 80, 10, 30, 0);
 		
 		// save when power was last pressed, for touchwake.
 		do_gettimeofday(&time_pressed_power);
