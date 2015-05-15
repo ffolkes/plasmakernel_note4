@@ -70,7 +70,7 @@ static void ssp_sensorhub_log(const char *func_name,
 		
 		if (orientation != last_orientation && ((orientation == 0 && last_orientation != 2) || orientation == 1 || orientation == 3)) {
 			// TODO: compiler tags
-			zzmoove_boost(1, 10, 0, 10, 0, 10, 15, 0);
+			zzmoove_boost(1, 25, 0, 25, 50, 25, 50, 0);
 		}
 		
 		last_orientation = orientation;
