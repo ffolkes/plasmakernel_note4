@@ -23,7 +23,7 @@ extern bool flg_epen_tsp_block;
 extern bool flg_tk_tsp_block;
 extern void vk_press_button(int keycode, bool delayed, bool force, bool elastic, bool powerfirst);
 extern void press_power(void);
-extern void controlVibrator(unsigned int duration, unsigned int strength);
+//extern void controlVibrator(unsigned int duration, unsigned int strength);
 extern bool tw_trip(void);
 extern bool sttg_pu_allow_tks;
 extern bool sttg_pu_allow_mediamode;
@@ -815,7 +815,7 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 	}
 	
 	if (flg_power_suspended) {
-		if (tw_trip() || touch_x_start >= 0) {
+		if (tw_trip() || (touch_x_start >= 0 && tkf_active_code == -1)) {
 			// if this is a touchwake trip, ignore the input.
 			// OR - screen is being touched, no flicks or slides.
 			return IRQ_HANDLED;
@@ -839,19 +839,14 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 	
-	if (flg_power_suspended && !plasma_media_active) {
-		// if the screen is off and no media is playing,
-		// tk's should be ignored.
-		return IRQ_HANDLED;
-	}
-	
 	// start the tsp block (doesn't affect tkf).
 	tk_refreshTSPblock();
 	
 	tk_key_keycode = tk_applyCustomkeycode(code, info->keycode[code]);
 	
 	if (
-		(touch_x_start < 1  // don't allow tkf if the tsp is already being touched
+		((touch_x_start < 1  // don't allow tkf if the tsp is already being touched
+		  || tkf_active_code > -1)  // when we slide, we are sloppy, so we have to allow errant tsp contact
 		 || (!press && code == tkf_active_code && tkf_active_key_state)  // but allow tkf release
 		)
 		&& (
@@ -861,7 +856,7 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 				 || (code == 1 && sttg_tkf_key2_key_code)  // key2 is being pressed, is it enabled?
 				)
 			)
-			|| (flg_power_suspended && sttg_tks_mode
+			|| (flg_power_suspended && (sttg_tks_mode == 1 || (sttg_tks_mode == 2 && plasma_media_active))
 				&& (
 					(code == 0 && sttg_tks_l2r_key_code)  // key1 is being pressed, is it enabled?
 					|| (code == 1 && sttg_tks_r2l_key_code)  // key2 is being pressed, is it enabled?
@@ -930,7 +925,8 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 						code, tkf_active_code, tkf_active_keycode);
 				
 				// what if this is a slide?
-				if (tkf_active_code >= 0 && tkf_active_code != code
+				if ((sttg_tks_mode == 1 || (sttg_tks_mode == 2 && plasma_media_active))
+					&& tkf_active_code >= 0 && tkf_active_code != code
 					&& (!flg_power_suspended || time_since_tkf_lastpress > 50)) {
 					// this is not the same key that went down, therefore it is
 					// not a double press and instead a slide. however if the work was
@@ -938,13 +934,14 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 					// to avoid double processing. otherwise, keep the work cancelled,
 					// determine the payload, and block further tk input.
 					
+					// this is now done in vk_press_button
 					// vibrate.
-					controlVibrator(25, 50);
+					//controlVibrator(25, 50);
 					
 					if (code == 0) {
 						pr_info(LOGTAG"/cypress_touchkey_interrupt/tkf] SLIDE DETECTED - R2L\n");
 						
-						if (plasma_media_active && sttg_tks_mediamode)
+						if (plasma_media_active && (sttg_tks_mediamode || sttg_tks_mode == 2))
 							vk_press_button(165, 0, 1, 0, 0);  // media previous
 						else if (sttg_pu_allow_tks || !pu_checkLockout())
 							vk_press_button(sttg_tks_r2l_key_code, sttg_tks_r2l_key_delay, 1, 0, sttg_tks_r2l_key_powerfirst);
@@ -952,7 +949,7 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 					} else if (code == 1) {
 						pr_info(LOGTAG"/cypress_touchkey_interrupt/tkf] SLIDE DETECTED - L2R\n");
 						
-						if (plasma_media_active && sttg_tks_mediamode)
+						if (plasma_media_active && (sttg_tks_mediamode || sttg_tks_mode == 2))
 							vk_press_button(163, 0, 1, 0, 0);  // media next
 						else if (sttg_pu_allow_tks || !pu_checkLockout())
 							vk_press_button(sttg_tks_l2r_key_code, sttg_tks_l2r_key_delay, 1, 0, sttg_tks_l2r_key_powerfirst);
@@ -1102,8 +1099,8 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		}
 		
 		if (
-			(code == 1 && ctr_tk_mt_presses == sttg_tk_mt_key1_mode)  // check for key1 nth
-			|| (code == 2 && ctr_tk_mt_presses == sttg_tk_mt_key2_mode)  // check for key2 nth
+			(code == 0 && ctr_tk_mt_presses == sttg_tk_mt_key1_mode)  // check for key1 nth
+			|| (code == 1 && ctr_tk_mt_presses == sttg_tk_mt_key2_mode)  // check for key2 nth
 			) {
 			// this is the nth press, so let it through.
 			
@@ -2793,7 +2790,7 @@ static void cypress_input_close(struct input_dev *dev)
 	
 	// if tk slide is enabled, or tk flick is enabled and tkf media mode is on
 	// and media is playing, keep the touchkeys on.
-	if (sttg_tks_mode
+	if (sttg_tks_mode == 1 || (sttg_tks_mode == 2 && plasma_media_active)
 		|| (sttg_tkf_mode && plasma_media_active && sttg_tkf_mediamode))
 		return;
 
