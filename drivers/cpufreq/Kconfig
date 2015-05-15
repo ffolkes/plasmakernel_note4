@@ -50,7 +50,7 @@ config CPU_FREQ_LIMIT
 choice
 	prompt "Default CPUFreq governor"
 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
-	default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+	default CPU_FREQ_DEFAULT_GOV_ZZMOOVE
 	help
 	  This option sets which CPUFreq governor shall be loaded at
 	  startup. If in doubt, select 'performance'.
@@ -131,6 +131,14 @@ config CPU_FREQ_DEFAULT_GOV_RACCOON_CITY
 	  the frequency statically to the lowest frequency supported by
 	  the CPU, while considering battery life to prevent unnecessary
 	  drain during suspend.
+
+config CPU_FREQ_DEFAULT_GOV_ZZMOOVE
+    bool "zzmoove"
+    select CPU_FREQ_GOV_ZZMOOVE
+    help
+        Use the CPUFreq governor 'zzmoove' as default, using predefined
+        frequency lookup tables and optimized scaling triggers instead of
+        % frequency steps to get smooth up/downscaling dependant on CPU load.
 
 config CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND
             bool "intellidemand"
@@ -250,15 +258,6 @@ config CPU_FREQ_GOV_UMBRELLA_CORE
 	  The governor is based on interactive to provide a resident controller
 	  which interprets unnecessary battery drain as evil.
 
-config CPU_FREQ_DEFAULT_GOV_ZZMOOVE
-        bool "zzmoove"
-        select CPU_FREQ_GOV_ZZMOOVE
-        select CPU_FREQ_GOV_PERFORMANCE
-        help
-                Use the CPUFreq governor 'zzmoove' as default, using predefined
-                frequency lookup tables and optimized scaling triggers instead of
-                % frequency steps to get smooth up/downscaling dependant on CPU load.
-
 config CPU_FREQ_GOV_RACCOON_CITY
 	tristate "'raccoon_city' cpufreq policy governor"
 	help
@@ -268,6 +267,15 @@ config CPU_FREQ_GOV_RACCOON_CITY
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called cpufreq_raccoon_city.
+
+config CPU_FREQ_GOV_ZZMOOVE
+	tristate "'zzmoove' cpufreq policy governor"
+	help
+		'zzmoove' - based on cpufreq_conservative, using predefined
+		frequency lookup tables and optimized scaling triggers instead of
+		% frequency steps to get smooth up/downscaling dependant on CPU load.
+
+		If in doubt, say N.
 
 config CPU_FREQ_GOV_DANCEDANCE
 	tristate "'dancedance' cpufreq governor"
@@ -344,16 +352,6 @@ config INTELLI_MAX_INACTIVE_FREQ
 	default	1134000
 	help
 	  Set default max inactive frequency for intellidemand
-
-config CPU_FREQ_GOV_ZZMOOVE
-	tristate "'zzmoove' cpufreq governor"
-	depends on CPU_FREQ
-	help
-		'zzmoove' - based on cpufreq_conservative, using predefined
-		frequency lookup tables and optimized scaling triggers instead of
-		% frequency steps to get smooth up/downscaling dependant on CPU load.
-
-		If in doubt, say N.
 
 config CPUFREQ_LIMIT_MAX_FREQ
 	bool "Limit Max Freq"

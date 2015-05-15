@@ -503,6 +503,9 @@ extern struct cpufreq_governor cpufreq_gov_bioshock;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_RACCOON_CITY)
 extern struct cpufreq_governor cpufreq_gov_raccoon_city;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_raccoon_city)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_ZZMOOVE)
+extern struct cpufreq_governor cpufreq_gov_zzmoove;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_zzmoove)
 #endif
 
 /*********************************************************************
