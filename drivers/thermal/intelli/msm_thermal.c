@@ -50,7 +50,7 @@ static struct msm_thermal_data msm_thermal_info = {
 	.core_temp_hysteresis_degC = 10,
 	.core_control_mask = 0xe,
 };
-static uint32_t limited_max_freq_thermal = MSM_CPUFREQ_NO_LIMIT;
+uint32_t limited_max_freq_thermal = MSM_CPUFREQ_NO_LIMIT;
 static struct delayed_work check_temp_work;
 static struct workqueue_struct *intellithermal_wq;
 bool core_control_enabled;
@@ -241,7 +241,7 @@ static void __ref check_temp(struct work_struct *work)
 		goto reschedule;
 	}
 	
-	pr_info("[msm_thermalv1/check_temp] getting sensor: %d/%d, value: %ld\n", tsens_dev.sensor_num, msm_thermal_info.sensor_id, temp);
+	//pr_info("[msm_thermalv1/check_temp] getting sensor: %d/%d, value: %ld, limited_max_freq_thermal: %d, limit_idx: %d\n", tsens_dev.sensor_num, msm_thermal_info.sensor_id, temp, limited_max_freq_thermal, limit_idx);
 
 	if (hist_index < MAX_HISTORY_SZ)
 		msm_thermal_stats.temp_history[hist_index] = temp;
