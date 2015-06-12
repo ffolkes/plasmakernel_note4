@@ -36,6 +36,11 @@ extern unsigned int current_limit_min;
 extern unsigned int current_limit_max;
 extern bool hardlimit_bypass;
 
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+bool sttg_scaling_governor_lock = false;
+bool sttg_scaling_freq_lock = false;
+#endif
+
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
  * level driver of CPUFreq support, and its spinlock. This lock
@@ -458,6 +463,40 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 /**
  * cpufreq_per_cpu_attr_write() / store_##file_name() - sysfs write access
  */
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+#define store_one(file_name, object)			\
+static ssize_t store_##file_name					\
+(struct cpufreq_policy *policy, const char *buf, size_t count)		\
+{									\
+	int ret;							\
+	struct cpufreq_policy new_policy;				\
+	\
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);		\
+	if (ret)							\
+	return -EINVAL;						\
+	\
+	ret = sscanf(buf, "%u", &new_policy.object);			\
+	if (ret != 1)							\
+	return -EINVAL;						\
+	\
+	if (sttg_scaling_freq_lock && (strstr(__func__, "max_freq") || strstr(__func__, "min_freq"))) {	\
+		/*pr_info("[cpufreq/%s] freq lock on, ignoring attempt to change freq to '%d' from '%d' for cpu %d\n",	\
+		 __func__, new_policy.object, policy->object, policy->cpu);*/	\
+		return -EINVAL;	\
+	}/* else	\
+	  pr_info("[cpufreq/%s] freq lock off, allowing freq change to '%d' from '%d' for cpu %d\n",	\
+	  __func__, new_policy.object, policy->object, policy->cpu);*/	\
+	\
+	ret = cpufreq_driver->verify(&new_policy);			\
+	if (ret)							\
+	pr_err("cpufreq: Frequency verification failed\n");	\
+	\
+	policy->user_policy.object = new_policy.object;			\
+	ret = cpufreq_set_policy(policy, &new_policy);		\
+	\
+	return ret ? ret : count;					\
+}
+#else
 #define store_one(file_name, object)			\
 static ssize_t store_##file_name					\
 (struct cpufreq_policy *policy, const char *buf, size_t count)		\
@@ -482,6 +521,7 @@ static ssize_t store_##file_name					\
 									\
 	return ret ? ret : count;					\
 }
+#endif
 
 /* Yank555.lu : CPU Hardlimit - Enforce userspace dvfs lock */
 #if defined(CONFIG_CPUFREQ_HARDLIMIT) && defined(CONFIG_SEC_PM)
@@ -576,6 +616,52 @@ static ssize_t show_cpuinfo_cur_freq(struct cpufreq_policy *policy,
 	return sprintf(buf, "%u\n", cur_freq);
 }
 
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+static ssize_t show_scaling_governor_lock(struct cpufreq_policy *policy, char *buf)
+{
+	return sprintf(buf, "%u\n", sttg_scaling_governor_lock);
+}
+
+static ssize_t store_scaling_governor_lock(struct cpufreq_policy *policy,
+									  const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	ret = sscanf(buf, "%u\n", &data);
+	if (ret) {
+		if (data > 0)
+			data = 1;
+		else
+			data = 0;
+		sttg_scaling_governor_lock = data;
+		pr_info("[cpufreq/%s] sttg_scaling_governor_lock has been set to: %u\n", __func__, sttg_scaling_governor_lock);
+	}
+	return count;
+}
+
+static ssize_t show_scaling_freq_lock(struct cpufreq_policy *policy, char *buf)
+{
+	return sprintf(buf, "%u\n", sttg_scaling_freq_lock);
+}
+
+static ssize_t store_scaling_freq_lock(struct cpufreq_policy *policy,
+										   const char *buf, size_t count)
+{
+	unsigned int ret;
+	unsigned int data;
+	ret = sscanf(buf, "%u\n", &data);
+	if (ret) {
+		if (data > 0)
+			data = 1;
+		else
+			data = 0;
+		sttg_scaling_freq_lock = data;
+		pr_info("[cpufreq/%s] sttg_scaling_freq_lock has been set to: %u\n", __func__, sttg_scaling_freq_lock);
+	}
+	return count;
+}
+#endif
+
 /**
  * show_scaling_governor - show the current policy for the specified CPU
  */
@@ -608,6 +694,16 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	ret = sscanf(buf, "%15s", str_governor);
 	if (ret != 1)
 		return -EINVAL;
+	
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+	if (sttg_scaling_governor_lock) {
+		/*pr_info("[cpufreq/%s] governor lock on, ignoring attempt to change governor to '%s' from '%s' for cpu %d\n",
+				__func__, str_governor, policy->governor->name, policy->cpu);*/
+		return -EINVAL;
+	}/* else
+		pr_info("[cpufreq/%s] governor lock off, allowing governor change to '%s' from '%s' for cpu %d\n",
+				__func__, str_governor, policy->governor->name, policy->cpu);*/
+#endif
 
 	if (cpufreq_parse_governor(str_governor, &new_policy.policy,
 						&new_policy.governor))
@@ -758,6 +854,10 @@ cpufreq_freq_attr_rw(UV_mV_table);
 #endif
 
 cpufreq_freq_attr_rw(scaling_max_freq);
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+cpufreq_freq_attr_rw(scaling_governor_lock);
+cpufreq_freq_attr_rw(scaling_freq_lock);
+#endif
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 
@@ -771,6 +871,10 @@ static struct attribute *default_attrs[] = {
 	&cpu_load.attr,
 	&affected_cpus.attr,
 	&related_cpus.attr,
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+	&scaling_governor_lock.attr,
+	&scaling_freq_lock.attr,
+#endif
 	&scaling_governor.attr,
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,

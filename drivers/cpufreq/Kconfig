@@ -400,6 +400,14 @@ config SEC_DVFS
 	default n
 	depends on CPU_FREQ
 
+config CPUFREQ_SIMPLESCALINGLOCK
+	bool "Plasma Simple Scaling Lock"
+	default n
+	depends on CPU_FREQ
+	help
+          A simple way to lock CPU governor min/max/name to prevent
+	  modification from conventional cpufreq sysfs entries.
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
