@@ -50,8 +50,8 @@
 static struct msm_thermal_data msm_thermal_info;
 static struct delayed_work check_temp_work;
 static struct delayed_work temp_log_work;
-static bool core_control_enabled;
-static uint32_t cpus_offlined;
+bool core_control_enabled;
+uint32_t cpus_offlined;
 static DEFINE_MUTEX(core_control_mutex);
 static struct kobject *cc_kobj;
 static struct task_struct *hotplug_task;
@@ -60,6 +60,8 @@ static struct task_struct *thermal_monitor_task;
 static struct completion hotplug_notify_complete;
 static struct completion freq_mitigation_complete;
 static struct completion thermal_monitor_complete;
+
+uint32_t limited_max_freq_thermal = -1;
 
 static int enabled;
 static int polling_enabled;
@@ -1412,6 +1414,11 @@ static void do_freq_control(long temp)
 {
 	uint32_t cpu = 0;
 	uint32_t max_freq = cpus[cpu].limited_max_freq;
+	
+	if (limit_idx != limit_idx_high)
+		limited_max_freq_thermal = -1;
+	else
+		limited_max_freq_thermal = 1;
 
 	if (temp >= msm_thermal_info.limit_temp_degC) {
 		if (limit_idx == limit_idx_low)
