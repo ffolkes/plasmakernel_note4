@@ -762,6 +762,8 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf,
         /* bounds check */
         val = min( max((unsigned int)val, (unsigned int)CPU_VDD_MIN),
                   (unsigned int)CPU_VDD_MAX);
+		
+		//pr_info("[clock/store_UV_mV_table] level: %d, val: %d\n", i, val);
         
         /* apply it to all available cores */
         for (j = 0; j < NR_CPUS; j++)
@@ -771,7 +773,7 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf,
         ret = sscanf(buf, "%s", size_cur);
         buf += strlen(size_cur) + 1;
     }
-    pr_warn("faux123: user voltage table modified!\n");
+    pr_warn("[clock/store_UV_mV_table] user voltage table modified\n");
     
     return count;
 }
