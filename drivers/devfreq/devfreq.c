@@ -220,12 +220,13 @@ int update_devfreq(struct devfreq *devfreq)
 		
 		freq = devfreq->max_freq;
 		
-		//pr_info("[devfreq] newfreq: %ld, name: %s\n", freq, devfreq->governor->name);
+		//pr_info("[devfreq] newfreq: %ld, name: %s, max: %ld, min: %ld\n",
+		//		freq, devfreq->governor->name, devfreq->max_freq, devfreq->min_freq);
 		
 	} else {
 		
 		// mid boost only applies to the gpu.
-		if (strstr(devfreq->governor->name, "msm-adreno-tz")){
+		if (devfreq->profile->num_governor_data == 2){
 			
 			// if the cable is attached and we have a min freq.
 			if (flg_power_cableattached && sttg_gpufreq_min_freq_cable > 0) {
@@ -268,6 +269,9 @@ int update_devfreq(struct devfreq *devfreq)
 		if (devfreq_update_status(devfreq, freq))
 			dev_err(&devfreq->dev,
 				"Couldn't update frequency transition information.\n");
+	
+	//pr_info("[devfreq] id: %d, name: %s, max: %ld, min: %ld, set: %ld\n",
+	//		devfreq->profile->num_governor_data, devfreq->governor->name, devfreq->max_freq, devfreq->min_freq, freq);
 
 	devfreq->previous_freq = freq;
 	return err;
