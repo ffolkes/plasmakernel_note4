@@ -1488,6 +1488,23 @@ try_nextdev:
 }
 EXPORT_SYMBOL(ipv6_dev_get_saddr);
 
+int __ipv6_get_lladdr(struct inet6_dev *idev, struct in6_addr *addr,
+		      unsigned char banned_flags)
+{
+	struct inet6_ifaddr *ifp;
+	int err = -EADDRNOTAVAIL;
+
+	list_for_each_entry(ifp, &idev->addr_list, if_list) {
+		if (ifp->scope == IFA_LINK &&
+		    !(ifp->flags & banned_flags)) {
+			*addr = ifp->addr;
+			err = 0;
+			break;
+		}
+	}
+	return err;
+}
+
 int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 		    unsigned char banned_flags)
 {
@@ -1497,17 +1514,8 @@ int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 	rcu_read_lock();
 	idev = __in6_dev_get(dev);
 	if (idev) {
-		struct inet6_ifaddr *ifp;
-
 		read_lock_bh(&idev->lock);
-		list_for_each_entry(ifp, &idev->addr_list, if_list) {
-			if (ifp->scope == IFA_LINK &&
-			    !(ifp->flags & banned_flags)) {
-				*addr = ifp->addr;
-				err = 0;
-				break;
-			}
-		}
+		err = __ipv6_get_lladdr(idev, addr, banned_flags);
 		read_unlock_bh(&idev->lock);
 	}
 	rcu_read_unlock();
@@ -1542,9 +1550,9 @@ int ipv6_chk_addr(struct net *net, const struct in6_addr *addr,
 		     (ipv6_use_optimistic_addr(ifp->idev) &&
 		      ifp->flags&IFA_F_OPTIMISTIC)) &&
 #else
-            !(ifp->flags&IFA_F_TENTATIVE) &&
+		     !(ifp->flags&IFA_F_TENTATIVE) &&
 #endif
-		    (dev == NULL || ifp->idev->dev == dev ||
+		     (dev == NULL || ifp->idev->dev == dev ||
 		     !(ifp->scope&(IFA_LINK|IFA_HOST) || strict))) {
 			rcu_read_unlock_bh();
 			return 1;
@@ -3158,13 +3166,11 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 
 	write_unlock_bh(&idev->lock);
 
-	/* Step 5: Discard anycast and multicast list */
-	if (how) {
-		ipv6_ac_destroy_dev(idev);
+	/* Step 5: Discard multicast list */
+	if (how)
 		ipv6_mc_destroy_dev(idev);
-	} else {
+	else
 		ipv6_mc_down(idev);
-	}
 
 	idev->tstamp = jiffies;
 

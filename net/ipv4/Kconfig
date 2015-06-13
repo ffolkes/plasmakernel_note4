@@ -593,9 +593,6 @@ choice
 	config DEFAULT_HTCP
 		bool "Htcp" if TCP_CONG_HTCP=y
 
-	config DEFAULT_HSTCP
-		bool "Highspeed" if TCP_CONG_HSTCP=y
-
 	config DEFAULT_HYBLA
 		bool "Hybla" if TCP_CONG_HYBLA=y
 
@@ -609,19 +606,7 @@ choice
 		bool "Westwood" if TCP_CONG_WESTWOOD=y
 
 	config DEFAULT_RENO
-		bool "Reno" if TCP_CONG_RENO=y
-
-	config DEFAULT_SCALABLE
-		bool "Scalable" if TCP_CONG_SCALABLE=y
-
-	config DEFAULT_LP
-		bool "Lp" if TCP_CONG_LP=y
-
-	config DEFAULT_YEAH
-		bool "Yeah" if TCP_CONG_YEAH=y
-
-	config DEFAULT_ILLINOIS
-		bool "Illinois" if TCP_CONG_ILLINOIS=y
+		bool "Reno"
 
 endchoice
 
@@ -637,16 +622,11 @@ config DEFAULT_TCP_CONG
 	default "bic" if DEFAULT_BIC
 	default "cubic" if DEFAULT_CUBIC
 	default "htcp" if DEFAULT_HTCP
-	default "highspeed" if DEFAULT_HSTCP
 	default "hybla" if DEFAULT_HYBLA
 	default "vegas" if DEFAULT_VEGAS
 	default "westwood" if DEFAULT_WESTWOOD
 	default "veno" if DEFAULT_VENO
 	default "reno" if DEFAULT_RENO
-	default "scalable" if DEFAULT_SCALABLE
-	default "lp" if DEFAULT_LP
-	default "yeah" if DEFAULT_YEAH
-	default "illinois" if DEFAULT_ILLINOIS
 	default "cubic"
 
 config TCP_MD5SIG
