@@ -546,6 +546,16 @@ static ssize_t store_scaling_min_freq
 	ret = sscanf(buf, "%u", &new_policy.min);
 	if (ret != 1)
 		return -EINVAL;
+	
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+	if (sttg_scaling_freq_lock) {
+		/*pr_info("[cpufreq/%s] freq lock on, ignoring attempt to change freq to '%d' from '%d' for cpu %d\n",
+		 __func__, new_policy.min, policy->min, policy->cpu);*/
+		return -EINVAL;
+	}/* else
+	  pr_info("[cpufreq/%s] freq lock off, allowing freq change to '%d' from '%d' for cpu %d\n",
+	  __func__, new_policy.min, policy->min, policy->cpu);*/
+#endif
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
@@ -587,6 +597,16 @@ static ssize_t store_scaling_max_freq
 	ret = sscanf(buf, "%u", &new_policy.max);
 	if (ret != 1)
 		return -EINVAL;
+	
+#ifdef CONFIG_CPUFREQ_SIMPLESCALINGLOCK
+	if (sttg_scaling_freq_lock) {
+		/*pr_info("[cpufreq/%s] freq lock on, ignoring attempt to change freq to '%d' from '%d' for cpu %d\n",
+		 __func__, new_policy.max, policy->max, policy->cpu);*/
+		return -EINVAL;
+	}/* else
+	  pr_info("[cpufreq/%s] freq lock off, allowing freq change to '%d' from '%d' for cpu %d\n",
+	  __func__, new_policy.max, policy->max, policy->cpu);*/
+#endif
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
