@@ -2531,7 +2531,9 @@ int cpufreq_update_policy(unsigned int cpu)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 	struct cpufreq_policy new_policy;
+#ifdef CONFIG_CPUFREQ_HARDLIMIT
 	struct cpufreq_policy *cpu0_policy = cpufreq_cpu_get(0);
+#endif
 	int ret;
 
 	if (!policy) {
